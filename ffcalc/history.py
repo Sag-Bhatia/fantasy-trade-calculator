@@ -30,11 +30,12 @@ from .simulate import NPOS, NROLES, QGRID, Tables
 log = logging.getLogger(__name__)
 
 HIST_SEASONS = (2022, 2023, 2024, 2025)
-TABLES_VERSION = 2  # bump when table-building logic changes, so old caches are ignored
+TABLES_VERSION = 3  # bump when table-building logic changes, so old caches are ignored
 WEEKS = range(1, 19)
 TIERS = 5
 MAX_OUT = 8  # longest absence tracked; longer ones are counted as 8
 SHRINK = 150  # correlation shrinkage toward 0: n / (n + SHRINK)
+SNAPSHOTS = range(3, 15)  # weeks a season-long forecast is frozen at, for `persistence`
 STATUSES = ("Questionable", "Doubtful", "Out")
 # Projected points (league scoring) below which a player-week isn't fantasy-relevant.
 MIN_PROJ = {"QB": 8.0, "RB": 4.0, "WR": 4.0, "TE": 3.0, "K": 4.0, "DEF": 3.0}
@@ -142,7 +143,8 @@ def player_weeks(
             frames.append(f)
     if not frames:
         raise RuntimeError("no historical weeks available")
-    return pl.concat(frames, how="vertical_relaxed")
+    # fixed row order: rank ties and anything built from this table are reproducible
+    return pl.concat(frames, how="vertical_relaxed").sort("season", "week", "sleeper_id")
 
 
 def _relevant(pw: pl.DataFrame) -> pl.DataFrame:
@@ -182,6 +184,51 @@ def residual_tables(pw: pl.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarra
             z[m] = ndtri((ranks + 0.5) / m.sum())
         parts.append(d.with_columns(pl.Series("z", z)))
     return edges, resid_q, floor, pl.concat(parts) if parts else rel.with_columns(z=pl.lit(0.0))
+
+
+def persistence(scored: pl.DataFrame) -> np.ndarray:
+    """(NPOS,) how much of a player's miss carries over from week to week, as a correlation
+    of normal scores. The simulator holds today's projection fixed for every later week, so
+    this is measured the same way: residuals of later weeks against the projection known at
+    a snapshot week. A player who turns out better (a new role, a breakout) beats a frozen
+    projection week after week; against each week's own projection it barely shows."""
+    rel = scored.select("season", "week", "sleeper_id", "position", "proj", "actual")
+    parts = []
+    for n in SNAPSHOTS:
+        known = (
+            rel.filter(pl.col("week") <= n)
+            .sort("week")
+            .group_by("season", "sleeper_id")
+            .agg(pl.col("proj").last().alias("p0"))
+        )
+        parts.append(
+            rel.filter(pl.col("week") > n)
+            .join(known, on=["season", "sleeper_id"])
+            .with_columns((pl.col("actual") - pl.col("p0")).alias("r"))
+            .select("season", "sleeper_id", "position", "r")
+            .with_columns(pl.lit(n).alias("snap"))
+        )
+    frozen = pl.concat(parts)
+    out = np.zeros(NPOS)
+    for p, name in enumerate(POSITIONS):
+        d = frozen.filter(pl.col("position") == name)
+        if d.height < 50:
+            continue  # shortcut: no evidence → weeks stay independent; only hit on tiny fixtures
+        r = d["r"].to_numpy()
+        z = ndtri((r.argsort().argsort() + 0.5) / len(r))
+        g = (
+            d.with_columns(pl.Series("z", z))
+            .group_by("season", "sleeper_id", "snap")
+            .agg(
+                pl.col("z").sum().alias("s"),
+                (pl.col("z") ** 2).sum().alias("q"),
+                pl.len().alias("k"),
+            )
+        )
+        pairs = float((g["k"] * (g["k"] - 1)).sum())
+        if pairs:
+            out[p] = float((g["s"] ** 2 - g["q"]).sum()) / pairs  # mean product over week pairs
+    return np.clip(out, 0.0, 0.5)
 
 
 def assign_roles(df: pl.DataFrame, by: list[str]) -> pl.DataFrame:
@@ -393,6 +440,7 @@ def build_tables(
     same, opp, n_pairs = correlation_tables(scored, pw)
     hazard, pmf = injury_tables(pw)
     tables = Tables(edges, resid_q, floor, same, opp, hazard, pmf, source=f"sleeper {seasons}")
+    tables.persist = persistence(scored)
     if injuries is not None and table is not None and not injuries.is_empty():
         tables.status_play, tables.status_mult = status_tables(pw, injuries, table)
     summary = {
@@ -401,6 +449,7 @@ def build_tables(
         "relevant_played": scored.height,
         "game_pairs": n_pairs,
         "hazard": dict(zip(POSITIONS, np.round(hazard, 4).tolist(), strict=True)),
+        "persist": dict(zip(POSITIONS, np.round(tables.persist, 3).tolist(), strict=True)),
         "status_play": tables.status_play,
     }
     return tables, summary

@@ -1,4 +1,5 @@
 import type {
+  BalanceResult,
   FindResult,
   GradeResult,
   League,
@@ -88,4 +89,6 @@ export const api = {
   ) => stream<GradeResult>("/api/grade", b, onProgress),
   find: (b: { league_id: string; team: number }, onProgress: (m: string) => void) =>
     stream<FindResult>("/api/find", b, onProgress),
+  balance: (b: { league_id: string; team: number; partner: number; give: string[]; get: string[] }, onProgress: (m: string) => void) =>
+    stream<BalanceResult>("/api/balance", b, onProgress),
 };

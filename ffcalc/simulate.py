@@ -44,6 +44,9 @@ class Tables:
     hazard: np.ndarray  # (NPOS,) chance per game a player gets hurt and misses later weeks
     duration_pmf: np.ndarray  # (NPOS, D) P(misses exactly d+1 more weeks)
     source: str = "placeholder"
+    # (NPOS,) week-to-week correlation of a player's misses vs a frozen projection
+    # (history.persistence); 0 = every week independent
+    persist: np.ndarray = field(default_factory=lambda: np.zeros(NPOS))
     # game status → per-position P(plays) and mean multiplier if he plays
     # placeholder defaults until history.status_tables runs on nflverse injury reports
     status_play: dict[str, list[float]] = field(
@@ -130,6 +133,14 @@ def simulate_players(inp: SimInputs, tables: Tables, sims: int, seed: int) -> Ou
     dur_cdf = np.cumsum(tables.duration_pmf, axis=1)[inp.pos]  # (P, D)
     out_weeks = inp.out_weeks if len(inp.out_weeks) else np.zeros(n_players, int)
 
+    # season-long surprise: one draw per player per sim shared by all his weeks, so a player
+    # who beats today's projection tends to keep beating it; each week's spread is unchanged
+    rho = np.asarray(tables.persist, np.float32)[inp.pos]
+    season_z = np.empty((sims, n_players), np.float32)
+    for i, g in enumerate(gens):
+        season_z[:, i] = g.standard_normal(sims, dtype=np.float32)
+    keep, fresh = np.sqrt(rho)[None, :], np.sqrt(1 - rho)[None, :]
+
     points = np.zeros((sims, n_weeks, n_players), np.float32)
     known_out = np.zeros((sims, n_weeks, n_players), bool)
     out_left = np.broadcast_to(out_weeks, (sims, n_players)).copy()
@@ -142,6 +153,7 @@ def simulate_players(inp: SimInputs, tables: Tables, sims: int, seed: int) -> Ou
             z[:, i] = g.standard_normal(sims, dtype=np.float32)
             u3[:, :, i] = g.random((3, sims), dtype=np.float32)
         u_play, u_hurt, u_dur = u3
+        z = keep * season_z + fresh * z
 
         for idx, chol in _game_factors(inp, tables, w):
             z[:, idx] = z[:, idx] @ chol.T

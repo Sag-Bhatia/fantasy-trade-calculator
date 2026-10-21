@@ -275,6 +275,28 @@ def test_find_stream(client, ctx):
         assert set(o) >= {"me", "them", "me_points", "them_points", "market_gap", "moves"}
 
 
+@pytest.mark.slow
+def test_balance_stream_describes_each_change(client):
+    b = a_trade(client)
+    lines = ndjson(client.post("/api/balance", json=b))
+    assert lines[-1]["type"] == "result", lines[-1]
+    res = lines[-1]["result"]
+    assert res["tried"] > 0
+    for o in res["offers"]:
+        c = o["change"]
+        assert sum(len(v) for v in c.values()) == 1  # exactly one player added or removed
+        give = {p["id"] for p in o["give"]}
+        assert give == (set(b["give"]) | {p["id"] for p in c["give_added"]}) - {
+            p["id"] for p in c["give_removed"]
+        }
+        assert set(o) >= {"partner", "get", "me", "them", "moves"}
+
+
+def test_balance_rejects_a_bad_trade(client):
+    body = {"league_id": LEAGUE, "team": ME, "partner": ME, "give": [], "get": []}
+    assert client.post("/api/balance", json=body).status_code == 422
+
+
 def test_find_unknown_team_is_404(client):
     assert client.post("/api/find", json={"league_id": LEAGUE, "team": 99}).status_code == 404
 

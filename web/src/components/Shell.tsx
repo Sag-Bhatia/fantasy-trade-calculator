@@ -1,5 +1,5 @@
 import { ArrowLeftRight } from "lucide-react";
-import { Navigate, NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { Navigate, NavLink, Outlet, ScrollRestoration, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { api } from "../api";
 import { saveLastLeague, useLoad } from "../hooks";
 import type { League } from "../types";
@@ -101,6 +101,7 @@ export function Shell() {
         </div>
       )}
       <Outlet context={{ league: lg, team: me.roster_id, base } satisfies ShellCtx} />
+      <ScrollRestoration />
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t-[2.5px] border-ink bg-white px-1 pt-1.5 pb-5 md:hidden">
         {TABS.map((t) => (
           <NavLink

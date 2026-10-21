@@ -103,7 +103,8 @@ export function Finder() {
   );
 }
 
-function OfferCard({ o, base }: { o: Offer; base: string }) {
+/** One suggested trade. `to`/`cta` change where the button goes; `note` says what's different. */
+export function OfferCard({ o, base, to, cta = "Grade this trade in detail", note }: { o: Offer; base: string; to?: string; cta?: string; note?: string }) {
   const q = new URLSearchParams({ partner: String(o.partner.roster_id), give: o.give.map((p) => p.id).join(","), get: o.get.map((p) => p.id).join(",") });
   const gap = o.market_gap;
   return (
@@ -119,6 +120,7 @@ function OfferCard({ o, base }: { o: Offer; base: string }) {
           </span>
         )}
       </header>
+      {note && <p className="px-5 pt-1 text-[15px] font-bold">{note}</p>}
       <div className="grid grid-cols-2 gap-2.5 px-5 py-2.5">
         <div className="flex flex-col gap-1 rounded-[14px] bg-you-tint px-3 py-2.5">
           <span className="text-xs font-bold text-you-deep">You send</span>
@@ -142,10 +144,10 @@ function OfferCard({ o, base }: { o: Offer; base: string }) {
         </div>
       </div>
       <Link
-        to={`${base}?${q}`}
+        to={to ?? `${base}?${q}`}
         className="mt-auto flex min-h-[54px] items-center justify-center gap-2 border-t-[2.5px] border-ink bg-volt font-bold hover:bg-[#c3f21f]"
       >
-        Grade this trade in detail <ArrowRight size={18} strokeWidth={2.6} aria-hidden="true" />
+        {cta} <ArrowRight size={18} strokeWidth={2.6} aria-hidden="true" />
       </Link>
     </article>
   );

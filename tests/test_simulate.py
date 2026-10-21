@@ -276,3 +276,24 @@ def test_no_playoffs_means_no_champion():
     out = simulate_players(inp, placeholder_tables(), 50, 2)
     res = simulate_league(out, inp, league, cfg)
     assert not res.champion.any() and not res.made_playoffs.any()
+
+
+def test_persistence_links_a_players_weeks_without_changing_any_one_week():
+    from dataclasses import replace
+
+    _, inp, _ = synthetic()
+    inp = replace(inp, role=np.full_like(inp.role, -1), p_play=np.ones_like(inp.p_play))
+    t0 = replace(placeholder_tables(), hazard=np.zeros(len(POSITIONS)))  # no injuries
+    t1 = replace(t0, persist=np.full(len(POSITIONS), 0.3))
+    a = simulate_players(inp, t0, 4000, 5).points
+    b = simulate_players(inp, t1, 4000, 5).points
+    rbs = np.flatnonzero(inp.pos == POSITIONS.index("RB"))
+
+    def week_corr(x):  # mean correlation of a player's week 1 and week 2 scores
+        return np.mean([np.corrcoef(x[:, 0, i], x[:, 1, i])[0, 1] for i in rbs])
+
+    assert abs(week_corr(a)) < 0.05
+    assert 0.2 < week_corr(b) < 0.4  # 0.3 in normal-score space, a bit less after the floor
+    # each week's spread is the same; only the season total gets wider
+    assert np.allclose(a.std(0)[0, rbs], b.std(0)[0, rbs], rtol=0.08)
+    assert (b.sum(1)[:, rbs].std(0) > 1.2 * a.sum(1)[:, rbs].std(0)).all()

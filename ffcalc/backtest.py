@@ -265,6 +265,7 @@ def round_robin(n: int, weeks: range, rng: np.random.Generator) -> dict[int, lis
 
 def draft(pool: pl.DataFrame, rng: np.random.Generator) -> list[list[str]]:
     """Snake draft by noisy week-1 projection with simple position caps."""
+    pool = pool.sort("sleeper_id")  # the noise must land on the same players whatever the row order
     order = pool.with_columns(
         (pl.col("w1") * pl.Series(rng.lognormal(0, 0.15, pool.height))).alias("k")
     ).sort("k", descending=True)
@@ -308,7 +309,7 @@ def season_data(
         s.filter(pl.col("team").is_not_null())
         .group_by("sleeper_id", "position", "team")
         .agg(pl.len().alias("n"))
-        .sort("n", descending=True)
+        .sort(["n", "team"], descending=[True, False])  # a tie in games → alphabetical team
         .unique("sleeper_id", keep="first")
         .select("sleeper_id", "position", "team", pl.lit(None, pl.String).alias("injury_status"))
     )
@@ -318,6 +319,7 @@ def season_data(
     same, opp, _ = history.correlation_tables(scored, prior_pw)
     hazard, pmf = history.injury_tables(prior_pw)
     tables = Tables(edges, resid_q, floor, same, opp, hazard, pmf, source=f"sleeper < {season}")
+    tables.persist = history.persistence(scored)
     proj = {(a, b): c for a, b, c in s.select("sleeper_id", "week", "proj").iter_rows()}
     actual = {
         (a, b): c

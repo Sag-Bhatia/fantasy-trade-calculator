@@ -1,12 +1,13 @@
-import { ChevronLeft, Copy, RotateCcw } from "lucide-react";
+import { ChevronLeft, Copy, RotateCcw, Scale } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../api";
 import { useShell } from "../components/Shell";
-import { Button, Card, ErrorNote, Pill, Segmented } from "../components/ui";
+import { Button, Card, ErrorNote, Pill, Segmented, Spinner } from "../components/ui";
 import { pct, pp, signed } from "../format";
 import { recall, remember, useCountUp, useLoad } from "../hooks";
-import type { GradeResult, TeamResult } from "../types";
+import { OfferCard } from "./Finder";
+import type { BalanceResult, Change, GradeResult, TeamResult } from "../types";
 
 const EXPLAIN: Record<string, string> = {
   Starters: "Who you’d start in an average week with everyone healthy. Swapping two starters for one better one shows up here.",
@@ -64,7 +65,7 @@ export function Result() {
       </div>
       {error && <ErrorNote>{error}</ErrorNote>}
       {!error && !result && <Simulating sims={sims} steps={steps} partnerName={league.teams.find((t) => t.roster_id === partner)?.name ?? ""} />}
-      {result && <Graded r={result} base={base} deal={deal} />}
+      {result && <Graded key={key} r={result} base={base} deal={deal} trade={{ league_id: league.league_id, team, partner, give, get, sims }} />}
     </main>
   );
 }
@@ -130,7 +131,9 @@ function summary(r: GradeResult): string {
   return head + why + them;
 }
 
-function Graded({ r, base, deal }: { r: GradeResult; base: string; deal: { give: string; get: string } }) {
+type TradeRequest = { league_id: string; team: number; partner: number; give: string[]; get: string[]; sims: number };
+
+function Graded({ r, base, deal, trade }: { r: GradeResult; base: string; deal: { give: string; get: string }; trade: TradeRequest }) {
   const [run, setRun] = useState(0);
   const t = useCountUp(run);
   const [side, setSide] = useState<"a" | "b">("a");
@@ -170,6 +173,8 @@ function Graded({ r, base, deal }: { r: GradeResult; base: string; deal: { give:
           <RotateCcw size={18} aria-hidden="true" /> Watch the seasons play out again
         </Button>
       </div>
+
+      {!(r.a.title.value > r.a.title.se && r.b.title.value > r.b.title.se) && <MakeFair trade={trade} base={base} partnerName={r.b.name} />}
 
       {r.warnings.length > 0 && (
         <ul className="flex flex-col gap-1 text-[15px] text-muted">
@@ -399,5 +404,78 @@ function Moves({ r }: { r: GradeResult }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function describe(c: Change, partnerName: string): string {
+  const names = (ps: { name: string }[]) => ps.map((p) => p.name).join(", ");
+  if (c.give_added.length) return `You also send ${names(c.give_added)}`;
+  if (c.give_removed.length) return `You keep ${names(c.give_removed)}`;
+  if (c.get_added.length) return `You also get ${names(c.get_added)}`;
+  return `${partnerName} keeps ${names(c.get_removed)}`;
+}
+
+/** Tries one-player changes until both teams' title odds go up. */
+function MakeFair({ trade, base, partnerName }: { trade: TradeRequest; base: string; partnerName: string }) {
+  const key = `balance:${trade.league_id}:${trade.team}:${trade.partner}:${trade.give.join(",")}:${trade.get.join(",")}`;
+  const [found, setFound] = useState<BalanceResult | undefined>(() => recall<BalanceResult>(key));
+  const [step, setStep] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function run() {
+    setBusy(true);
+    setError("");
+    try {
+      const { sims: _sims, ...body } = trade;
+      const res = await api.balance(body, setStep);
+      remember(key, res);
+      setFound(res);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const href = (o: BalanceResult["offers"][number]) =>
+    `${base}/result?${new URLSearchParams({ partner: String(trade.partner), give: o.give.map((p) => p.id).join(","), get: o.get.map((p) => p.id).join(","), sims: String(trade.sims) })}`;
+
+  return (
+    <Card className="flex flex-col gap-4 p-6" aria-labelledby="fair">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex max-w-[62ch] flex-col gap-1.5">
+          <h2 id="fair" className="font-display text-2xl font-extrabold">
+            Make it work for both teams
+          </h2>
+          <p className="text-[16px] leading-relaxed">
+            This trade isn’t a clear win for both sides. We’ll try adding or removing one player to find versions where both teams’ title odds go up, so {partnerName} has a reason to say yes. It takes about half a minute.
+          </p>
+        </div>
+        {!found && (
+          <Button tone="volt" size="lg" onClick={run} disabled={busy}>
+            <Scale size={20} aria-hidden="true" /> {busy ? "Searching…" : "Make it fair"}
+          </Button>
+        )}
+      </div>
+      {busy && <Spinner label={step || "Starting"} />}
+      {error && <ErrorNote>{error}</ErrorNote>}
+      {found && found.offers.length === 0 && (
+        <p className="text-[16px]">
+          None of the {found.tried} one-player changes we tried helps both teams by more than the margin of error.{" "}
+          <Link to={`${base}/find`} className="font-bold text-you underline">
+            Find trades
+          </Link>{" "}
+          searches for whole new deals instead.
+        </p>
+      )}
+      {found && found.offers.length > 0 && (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {found.offers.map((o, i) => (
+            <OfferCard key={i} o={o} base={base} to={href(o)} cta="Grade this version" note={describe(o.change, partnerName)} />
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }

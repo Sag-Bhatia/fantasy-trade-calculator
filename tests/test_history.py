@@ -445,3 +445,23 @@ def test_save_load_round_trip(sleeper, injuries_and_ids):
     assert load_tables(STANDARD_PPR, [2024, 2025]) is None
     # key ignores dict ordering
     assert load_tables(dict(reversed(list(STANDARD_PPR.items()))), SEASONS) is not None
+
+
+def test_persistence_finds_a_season_long_effect_against_a_frozen_projection():
+    rng = np.random.default_rng(0)
+    rows = []
+    for pid in range(400):
+        talent = rng.normal(0, 4)  # how much better than projected he really is, all season
+        for w in range(1, 18):
+            proj = 12.0 + (0.5 * talent if w > 1 else 0.0) * min(w, 6) / 6  # projections catch up
+            rows.append(("WR", 2025, w, str(pid), proj, proj + talent + rng.normal(0, 6)))
+    for pid in range(400, 800):  # no effect at all
+        for w in range(1, 18):
+            rows.append(("RB", 2025, w, str(pid), 12.0, 12.0 + rng.normal(0, 6)))
+    scored = pl.DataFrame(
+        rows, schema=["position", "season", "week", "sleeper_id", "proj", "actual"], orient="row"
+    )
+    rho = dict(zip(POSITIONS, history.persistence(scored), strict=True))
+    assert 0.05 < rho["WR"] < 0.4
+    assert rho["RB"] < 0.02
+    assert rho["QB"] == 0.0  # no rows → independent weeks

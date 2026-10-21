@@ -65,3 +65,37 @@ def test_diverse_drops_throw_in_variants_and_caps_each_partner():
     ]
     picked = finder.diverse(ranked, n=10, per_team=2)
     assert picked == [ranked[0], ranked[2], ranked[4]]
+
+
+def test_tweaks_change_exactly_one_player(ctx):
+    me, them = ctx.league.team(1), ctx.league.team(6)
+    tr = finder.Trade(1, 6, [p for p in me.players if p in ctx.index][:2],
+                      [p for p in them.players if p in ctx.index][:1])  # fmt: skip
+    tw = finder.tweaks(ctx, tr)
+    assert tw
+    keys = set()
+    for t in tw:
+        diff = set(t.a_gives) ^ set(tr.a_gives) | set(t.b_gives) ^ set(tr.b_gives)
+        assert len(diff) == 1
+        assert len(t.a_gives) <= finder.MAX_SIDE and len(t.b_gives) <= finder.MAX_SIDE
+        assert set(t.a_gives) <= set(me.players) and set(t.b_gives) <= set(them.players)
+        added = diff - set(tr.a_gives) - set(tr.b_gives)
+        assert all(ctx.inputs.pos[ctx.index[p]] not in (4, 5) for p in added)  # no K/DEF
+        keys.add((tuple(sorted(t.a_gives)), tuple(sorted(t.b_gives))))
+    assert len(keys) == len(tw)  # no repeats
+    # the side giving two can keep either one; the side giving one can't drop to zero
+    assert sum(len(t.a_gives) == 1 for t in tw) == 2
+    assert not any(len(t.b_gives) == 0 for t in tw)
+
+
+@pytest.mark.slow
+def test_balance_returns_only_mutually_beneficial_tweaks(ctx):
+    me, them = ctx.league.team(1), ctx.league.team(6)
+    tr = finder.Trade(1, 6, [p for p in me.players if p in ctx.index][:1],
+                      [p for p in them.players if p in ctx.index][:1])  # fmt: skip
+    found = finder.balance(ctx, tr, screen_sims=300, confirm_sims=1000)
+    tweaked = {(tuple(t.a_gives), tuple(t.b_gives)) for t in finder.tweaks(ctx, tr)}
+    for s in found:
+        assert (tuple(s.trade.a_gives), tuple(s.trade.b_gives)) in tweaked
+        assert s.a_title.value > s.a_title.se and s.b_title.value > s.b_title.se
+    assert len(found) <= finder.BALANCE_KEEP

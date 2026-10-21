@@ -71,7 +71,9 @@ Then pick **your team**. The app remembers your league next time.
   - how your title and playoff odds change, and theirs;
   - a chart of why: starters, depth, waiver wire, schedule and byes, injury risk,
     playoff weeks;
-  - week-by-week scores, a market-value check, and any pickups or cuts the trade forces.
+  - week-by-week scores, a market-value check, and any pickups or cuts the trade forces;
+  - if it isn't a win for both teams, a **Make it fair** button that tries adding or
+    removing one player (about half a minute) and shows versions both teams win.
 - **Your league:** everyone's playoff and title odds today, and trades already made in
   your league.
 - **Find trades:** searches every roster for deals that raise both teams' title odds.

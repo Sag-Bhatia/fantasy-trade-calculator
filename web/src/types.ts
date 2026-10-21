@@ -106,6 +106,10 @@ export type Offer = {
 
 export type FindResult = { checked: number; rosters: number; offers: Offer[] };
 
+/** What a "Make it fair" option changes, relative to the trade the user built. */
+export type Change = { give_added: Player[]; give_removed: Player[]; get_added: Player[]; get_removed: Player[] };
+export type BalanceResult = { tried: number; offers: (Offer & { change: Change })[] };
+
 export type StreamLine<T> =
   | { type: "progress"; message: string }
   | { type: "result"; result: T }

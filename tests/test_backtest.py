@@ -47,3 +47,19 @@ def test_snapshot_league_counts_only_earlier_weeks():
     a, b = lg.teams
     assert (a.wins, a.losses, b.wins, b.losses) == (1, 1, 1, 1)
     assert a.points_for == pytest.approx(150.0) and lg.current_week == 3
+
+
+def test_draft_does_not_depend_on_row_order():
+    import numpy as np
+
+    positions = ["QB"] * 30 + ["RB"] * 60 + ["WR"] * 60 + ["TE"] * 30 + ["K"] * 20 + ["DEF"] * 20
+    pool = pl.DataFrame(
+        {
+            "sleeper_id": [f"p{i:03d}" for i in range(len(positions))],
+            "position": positions,
+            "w1": [5.0 + (i * 7919 % 97) / 5 for i in range(len(positions))],
+        }
+    )
+    a = bt.draft(pool, np.random.default_rng(3))
+    b = bt.draft(pool.reverse(), np.random.default_rng(3))
+    assert a == b and all(len(r) == len(bt.SLOTS) + bt.BENCH for r in a)

@@ -498,6 +498,33 @@ def grade(b: GradeBody) -> StreamingResponse:
         e, evaluate(e.ctx, tr, sims=b.sims, progress=progress)))  # fmt: skip
 
 
+def _offer(e: Entry, s: finder.Suggestion) -> dict[str, Any]:
+    partner = e.ctx.league.team(s.trade.team_b)
+    return {
+        "partner": {
+            "roster_id": partner.roster_id,
+            "name": partner.name,
+            "record": _record(partner),
+        },
+        "give": [_brief(e, p) for p in s.trade.a_gives],
+        "get": [_brief(e, p) for p in s.trade.b_gives],
+        "me": _delta(s.a_title),
+        "them": _delta(s.b_title),
+        "me_points": round(s.a_points, 2),
+        "them_points": round(s.b_points, 2),
+        "market_gap": None if s.market_gap is None else round(s.market_gap, 4),
+        "moves": [
+            {
+                "roster_id": m.roster_id,
+                "adds": [_brief(e, p) for p in m.adds],
+                "drops": [_brief(e, p) for p in m.drops],
+            }
+            for m in s.moves
+            if m.adds or m.drops
+        ],
+    }
+
+
 @app.post("/api/find")
 def find(b: FindBody) -> StreamingResponse:
     e = _load(b.league_id)
@@ -506,35 +533,30 @@ def find(b: FindBody) -> StreamingResponse:
 
     def work(progress: Callable[[str], None]) -> dict[str, Any]:
         checked = len(finder.candidates(ctx, b.team))
-        offers = []
-        for s in finder.find_trades(ctx, b.team, progress=progress):
-            partner = ctx.league.team(s.trade.team_b)
-            offers.append(
-                {
-                    "partner": {
-                        "roster_id": partner.roster_id,
-                        "name": partner.name,
-                        "record": _record(partner),
-                    },
-                    "give": [_brief(e, p) for p in s.trade.a_gives],
-                    "get": [_brief(e, p) for p in s.trade.b_gives],
-                    "me": _delta(s.a_title),
-                    "them": _delta(s.b_title),
-                    "me_points": round(s.a_points, 2),
-                    "them_points": round(s.b_points, 2),
-                    "market_gap": None if s.market_gap is None else round(s.market_gap, 4),
-                    "moves": [
-                        {
-                            "roster_id": m.roster_id,
-                            "adds": [_brief(e, p) for p in m.adds],
-                            "drops": [_brief(e, p) for p in m.drops],
-                        }
-                        for m in s.moves
-                        if m.adds or m.drops
-                    ],
-                }
-            )
+        offers = [_offer(e, s) for s in finder.find_trades(ctx, b.team, progress=progress)]
         return {"checked": checked, "rosters": len(ctx.league.teams) - 1, "offers": offers}
+
+    return _stream(work)
+
+
+@app.post("/api/balance")
+def balance(b: PreviewBody) -> StreamingResponse:
+    """Small changes to a trade that make it a win for both teams ("Make it fair")."""
+    e = _load(b.league_id)
+    tr = _trade(e.ctx, b)
+
+    def work(progress: Callable[[str], None]) -> dict[str, Any]:
+        offers = []
+        for s in finder.balance(e.ctx, tr, progress=progress):
+            o = _offer(e, s)
+            o["change"] = {  # what differs from the trade the user built
+                "give_added": [_brief(e, p) for p in s.trade.a_gives if p not in tr.a_gives],
+                "give_removed": [_brief(e, p) for p in tr.a_gives if p not in s.trade.a_gives],
+                "get_added": [_brief(e, p) for p in s.trade.b_gives if p not in tr.b_gives],
+                "get_removed": [_brief(e, p) for p in tr.b_gives if p not in s.trade.b_gives],
+            }
+            offers.append(o)
+        return {"tried": len(finder.tweaks(e.ctx, tr)), "offers": offers}
 
     return _stream(work)
 
