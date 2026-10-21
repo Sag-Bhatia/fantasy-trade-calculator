@@ -5,13 +5,14 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
 from .clients.fantasycalc import SCHEMA
 from .models import League
-from .trade import Trade
+if TYPE_CHECKING:  # type-only: trade.py imports this module lazily
+    from .trade import Trade
 
 log = logging.getLogger(__name__)
 
