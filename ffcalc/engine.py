@@ -168,7 +168,7 @@ def prepare(
     table = ids.player_table(
         src.sleeper.players(), src.nflverse.ff_playerids() if src.nflverse else pl.DataFrame()
     )
-    progress("Blending projections")
+    progress("Blending projections (the very first run downloads past seasons: 2–3 minutes)")
     proj = projections.build(
         src, league.season, league.current_week, sim_weeks(league), league.scoring, table, fp_lines
     )

@@ -102,13 +102,18 @@ def friendly_errors() -> Any:
 
 @st.cache_resource(show_spinner=False, ttl=600, max_entries=4)
 def load_context(
-    league_id: str, fp_csv: bytes | None = None, fp_week: int | None = None
+    league_id: str,
+    fp_csv: bytes | None = None,
+    fp_week: int | None = None,
+    _progress: Callable[[str], None] = lambda _: None,
 ) -> engine.Context:
     fp_lines = None
     if fp_csv:
         fp_lines = _fp_lines(league_id, fp_csv, fp_week)
     src = source_factory() if source_factory else None
-    return engine.prepare(league_id, src=src, fp_lines=fp_lines, build_history=build_history)
+    return engine.prepare(
+        league_id, src=src, fp_lines=fp_lines, build_history=build_history, progress=_progress
+    )
 
 
 def _fp_lines(league_id: str, fp_csv: bytes, week: int | None) -> pl.DataFrame:
@@ -126,7 +131,7 @@ def context(league_id: str, status_label: str = "Loading your league") -> engine
     fp = st.session_state.get("fp_csv")
     fp_week = st.session_state.get("fp_week")
     with friendly_errors(), st.status(status_label, expanded=False) as s:
-        ctx = load_context(league_id, fp, fp_week)
+        ctx = load_context(league_id, fp, fp_week, lambda m: s.update(label=f"{m}…"))
         s.update(label="League loaded", state="complete")
     return ctx
 
