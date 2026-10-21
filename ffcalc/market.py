@@ -11,6 +11,7 @@ import polars as pl
 
 from .clients.fantasycalc import SCHEMA
 from .models import League
+
 if TYPE_CHECKING:  # type-only: trade.py imports this module lazily
     from .trade import Trade
 
