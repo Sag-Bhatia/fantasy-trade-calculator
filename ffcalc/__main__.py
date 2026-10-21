@@ -93,8 +93,8 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"{partner}: give {', '.join(ctx.name(p) for p in s.trade.a_gives)}"
                 f" for {', '.join(ctx.name(p) for p in s.trade.b_gives)}"
-                f"  | your title odds {s.a_title.value * 100:+.1f} ± {s.a_title.se * 100:.1f} pts,"
-                f" theirs {s.b_title.value * 100:+.1f} ± {s.b_title.se * 100:.1f} pts"
+                f"  | your title odds {s.a_title.value * 100:+.1f} ± {s.a_title.se * 100:.1f} pp,"
+                f" theirs {s.b_title.value * 100:+.1f} ± {s.b_title.se * 100:.1f} pp"
             )
         return 0
     if args.cmd == "teams":
