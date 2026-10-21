@@ -148,7 +148,7 @@ export function LeaguePage() {
             ))}
             <span className="text-[13px] text-muted">Today’s FantasyCalc market value of what each team received.</span>
           </Card>
-          <FantasyPros leagueId={league.league_id} on={league.fantasypros} week={Math.min(league.week, 18)} />
+          {league.fantasypros_upload && <FantasyPros leagueId={league.league_id} on={league.fantasypros} week={Math.min(league.week, 18)} />}
         </aside>
       </div>
     </main>

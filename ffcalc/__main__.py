@@ -65,7 +65,7 @@ def serve(args: argparse.Namespace) -> int:
 
     url = f"http://localhost:{args.port}"
     server = uvicorn.Server(
-        uvicorn.Config(app, host="127.0.0.1", port=args.port, log_level="warning")
+        uvicorn.Config(app, host=args.host, port=args.port, log_level="warning")
     )
 
     def open_when_up() -> None:
@@ -107,6 +107,9 @@ def main(argv: list[str] | None = None) -> int:
 
     sv = sub.add_parser("serve", help="run the web app")
     sv.add_argument("--port", type=int, default=8000)
+    sv.add_argument(
+        "--host", default="127.0.0.1", help="0.0.0.0 to accept other computers (hosting)"
+    )
     sv.add_argument("--no-browser", action="store_true", help="don't open the browser")
 
     args = ap.parse_args(argv)

@@ -38,6 +38,7 @@ export type League = {
   trade_deadline: number;
   deadline_passed: boolean;
   fantasypros: boolean;
+  fantasypros_upload: boolean; // false on the shared online copy
   teams: TeamSummary[];
   warnings: string[];
 };

@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
 import queue
 import threading
 import time
@@ -41,6 +42,10 @@ build_history = True
 DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 CACHE_SECONDS = 600
 SIM_CHOICES = (3_000, 10_000)
+# a shared public copy (e.g. Hugging Face): uploads would change everyone's numbers, so they're off
+HOSTED = os.environ.get("FFCALC_HOSTED") == "1"
+HEAVY_JOBS = 2  # grades/searches at once; each uses about one CPU core and up to ~1 GB
+_heavy = threading.BoundedSemaphore(HEAVY_JOBS)
 ODDS_SIMS = 3_000
 DOWN = "A data source didn't answer. Try again in a minute."
 NETWORK_ERRORS = (httpx.HTTPError, ConnectionError, OSError)
@@ -293,6 +298,7 @@ def league(league_id: str) -> dict[str, Any]:
         ],
         "warnings": ctx.warnings,
         "fantasypros": _lock(league_id)[0] in _fp,
+        "fantasypros_upload": not HOSTED,
     }
 
 
@@ -301,6 +307,10 @@ async def add_fantasypros(
     league_id: str, request: Request, week: int = Query(ge=1, le=18)
 ) -> dict[str, Any]:
     """Blend a FantasyPros projections CSV (the raw file is the request body) into this league."""
+    if HOSTED:
+        raise HTTPException(
+            403, "Adding a FantasyPros file only works when you run the app on your own computer."
+        )
     body = await request.body()
     if not body.strip():
         raise HTTPException(422, "That file is empty.")
@@ -467,6 +477,9 @@ def _stream(work: Callable[[Callable[[str], None]], dict[str, Any]]) -> Streamin
     q: queue.Queue[dict[str, Any] | None] = queue.Queue()
 
     def run() -> None:
+        if not _heavy.acquire(blocking=False):
+            q.put({"type": "progress", "message": "Waiting for another search to finish"})
+            _heavy.acquire()
         try:
             result = work(lambda m: q.put({"type": "progress", "message": m}))
             q.put({"type": "result", "result": result})
@@ -478,6 +491,7 @@ def _stream(work: Callable[[Callable[[str], None]], dict[str, Any]]) -> Streamin
             log.exception("request failed")
             q.put({"type": "error", "message": "Something went wrong. Try again in a minute."})
         finally:
+            _heavy.release()
             q.put(None)
 
     threading.Thread(target=run, daemon=True).start()

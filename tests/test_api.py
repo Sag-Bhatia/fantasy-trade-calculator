@@ -344,3 +344,28 @@ def test_fantasypros_upload_rebuilds_the_league_and_can_be_removed(client, monke
     assert client.delete(url).status_code == 200
     assert client.get(f"/api/league/{LEAGUE}").json()["fantasypros"] is False
     assert prepared[-1] is None
+
+
+def test_hosted_copy_turns_off_fantasypros_uploads(client, monkeypatch):
+    monkeypatch.setattr(api, "HOSTED", True)
+    assert client.get(f"/api/league/{LEAGUE}").json()["fantasypros_upload"] is False
+    r = client.post(f"/api/league/{LEAGUE}/fantasypros", params={"week": 7}, content=b"x,y")
+    assert r.status_code == 403 and "your own computer" in r.json()["detail"]
+
+
+def test_heavy_jobs_wait_their_turn(client, monkeypatch):
+    import threading
+
+    monkeypatch.setattr(api, "_heavy", threading.BoundedSemaphore(1))
+    api._heavy.acquire()  # someone else's search is running
+    body = {**a_trade(client), "sims": 3000}
+    out: list = []
+    t = threading.Thread(target=lambda: out.append(ndjson(client.post("/api/grade", json=body))))
+    t.start()
+    t.join(1.0)
+    assert t.is_alive()  # queued behind the running search
+    api._heavy.release()
+    t.join(60)
+    lines = out[0]
+    assert lines[0] == {"type": "progress", "message": "Waiting for another search to finish"}
+    assert lines[-1]["type"] == "result"
