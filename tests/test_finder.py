@@ -1,5 +1,6 @@
 import os
 import tempfile
+from collections import Counter
 
 import pytest
 
@@ -40,10 +41,27 @@ def test_need_filter_keeps_only_mutual_lineup_gains(ctx):
 
 @pytest.mark.slow
 def test_find_trades_returns_only_mutually_beneficial(ctx, monkeypatch):
-    monkeypatch.setattr(finder, "SCREEN_KEEP", 5)
-    monkeypatch.setattr(finder, "CONFIRM_KEEP", 3)
+    monkeypatch.setattr(finder, "PER_TEAM_SCREEN", 2)
+    monkeypatch.setattr(finder, "CONFIRM_KEEP", 6)
     found = finder.find_trades(ctx, 1, screen_sims=300, confirm_sims=1000)
     for s in found:
         assert s.a_title.value > s.a_title.se and s.b_title.value > s.b_title.se
+    per = Counter(s.trade.team_b for s in found)
+    assert all(n <= finder.MAX_PER_TEAM for n in per.values())
+    trades = [s.trade for s in found]
+    assert not any(finder._variant(t, trades[:i]) for i, t in enumerate(trades))
     mins = [min(s.a_title.value, s.b_title.value) for s in found]
     assert mins == sorted(mins, reverse=True)
+
+
+def test_diverse_drops_throw_in_variants_and_caps_each_partner():
+    T = finder.Trade
+    ranked = [
+        T(1, 2, ["a", "b"], ["x"]),
+        T(1, 2, ["a", "b"], ["x", "y"]),  # same core deal plus a throw-in
+        T(1, 2, ["c"], ["z"]),  # a different deal with the same team
+        T(1, 2, ["d"], ["w"]),  # third deal with team 2: over the cap
+        T(1, 3, ["a"], ["q"]),  # same player of mine, different partner: fine
+    ]
+    picked = finder.diverse(ranked, n=10, per_team=2)
+    assert picked == [ranked[0], ranked[2], ranked[4]]

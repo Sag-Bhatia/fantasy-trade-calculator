@@ -5,9 +5,13 @@
 2. Prune: market-value band (±30%, FantasyCalc when both sides are valued, else
    rest-of-season points) and positional need — both teams' expected starting lineups
    must improve (fast, vectorized, no randomness).
-3. Screen the survivors at 1,000 sims on one shared set of player outcomes.
-4. Confirm the best 10 at 10,000 sims; keep trades where both teams' title odds rise by
-   more than one standard error, ranked by the smaller of the two gains.
+3. Screen the best fits per partner at 1,000 sims on one shared set of player outcomes,
+   ranked by the smaller of the two teams' gains in expected starter points (precise even
+   at 1,000 sims; title odds at that size are ±1.5 points, too noisy to rank by).
+4. Pick a varied shortlist — the best version of each deal (no throw-in variants of the
+   same core trade) and at most two per partner — and confirm it at 10,000 sims; keep
+   trades where both teams' title odds rise by more than one standard error, ranked by the
+   smaller of the two gains.
 """
 
 from __future__ import annotations
@@ -36,8 +40,9 @@ TOP_PLAYERS = 8  # per roster, by rest-of-season expected points
 BAND = 0.30
 SCREEN_SIMS = 1_000
 CONFIRM_SIMS = 10_000
-SCREEN_KEEP = 40
-CONFIRM_KEEP = 10
+PER_TEAM_SCREEN = 10  # best positional fits simulated per partner
+MAX_PER_TEAM = 2  # suggestions per partner
+CONFIRM_KEEP = 12
 SEED = 11
 
 
@@ -160,6 +165,31 @@ def _deltas(ctx: Context, out: Outcomes, tp_base: np.ndarray, base_res: SeasonRe
     return d[0], d[1], p[0], p[1], pts[0], pts[1]
 
 
+def _variant(tr: Trade, picked: list[Trade]) -> bool:
+    """Same partner and overlapping players on both sides: a throw-in version of a deal
+    already picked (e.g. "A + B for C" vs "A + B for C + D")."""
+    return any(
+        t.team_b == tr.team_b
+        and set(t.a_gives) & set(tr.a_gives)
+        and set(t.b_gives) & set(tr.b_gives)
+        for t in picked
+    )
+
+
+def diverse(ranked: list[Trade], n: int, per_team: int) -> list[Trade]:
+    """Best-first picks with no variants of an earlier pick and at most per_team per partner."""
+    picked: list[Trade] = []
+    per: dict[int, int] = {}
+    for tr in ranked:
+        if len(picked) == n:
+            break
+        if per.get(tr.team_b, 0) >= per_team or _variant(tr, picked):
+            continue
+        picked.append(tr)
+        per[tr.team_b] = per.get(tr.team_b, 0) + 1
+    return picked
+
+
 def find_trades(
     ctx: Context,
     me: int,
@@ -170,8 +200,14 @@ def find_trades(
     progress("Listing possible deals")
     cands = candidates(ctx, me)
     progress(f"Checking positional fit for {len(cands):,} deals")
-    # shortcut: only the 3 × SCREEN_KEEP best positional fits are simulated (runtime budget)
-    fit = _need_filter(ctx, cands)[: SCREEN_KEEP * 3]
+    # shortcut: only each partner's PER_TEAM_SCREEN best positional fits are simulated
+    # (runtime budget); the cap also keeps one team's many combinations from crowding out the rest
+    fit = []
+    per: dict[int, int] = {}
+    for score, tr in _need_filter(ctx, cands):
+        if per.get(tr.team_b, 0) < PER_TEAM_SCREEN:
+            fit.append((score, tr))
+            per[tr.team_b] = per.get(tr.team_b, 0) + 1
     if not fit:
         return []
     progress(f"Simulating {len(fit)} promising deals")
@@ -184,11 +220,12 @@ def find_trades(
             cfg, moves = apply_trade(ctx, tr)
         except TradeError:
             continue
-        da, db, *_ = _deltas(ctx, out, tp_base, base_res, tr, cfg)
-        if da.value > 0 and db.value > 0:
-            screened.append((min(da.value, db.value), tr, cfg, moves))
+        *_, xa, xb = _deltas(ctx, out, tp_base, base_res, tr, cfg)
+        if xa > 0 and xb > 0:  # both starting lineups really get better in the sims
+            screened.append((min(xa, xb), tr, cfg, moves))
     screened.sort(key=lambda x: -x[0])
-    screened = screened[:CONFIRM_KEEP]
+    keep = {id(t) for t in diverse([x[1] for x in screened], CONFIRM_KEEP, MAX_PER_TEAM)}
+    screened = [x for x in screened if id(x[1]) in keep]
     if not screened:
         return []
     progress(f"Confirming the best {len(screened)} with {confirm_sims:,} seasons")
