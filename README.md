@@ -38,11 +38,12 @@ uv sync
 From this folder:
 
 ```bash
-uv run streamlit run app.py
+uv run python -m ffcalc serve
 ```
 
-Your browser opens at http://localhost:8501. If it doesn't, open that address yourself.
-To stop the app, go back to Terminal and press Ctrl C.
+Your browser opens at http://localhost:8000. If it doesn't, open that address yourself.
+To stop the app, go back to Terminal and press Ctrl C. (The app's screens come already
+built, so you don't need anything else installed.)
 
 **The very first time** you load a league it downloads four past seasons of data to learn
 how much scores swing and how often players get hurt. That takes 2–3 minutes. After
@@ -50,20 +51,20 @@ that, it's fast.
 
 ## 3. Find your league ID
 
-Paste your Sleeper **league ID** into the box on the left.
+Paste your Sleeper **league ID** into the box on the welcome screen.
 
 - **On a computer:** open your league at sleeper.com. The web address looks like
   `https://sleeper.com/leagues/1400221038771437568/team`. The long number is your league ID.
 - **Only use the phone app?** The easiest way is to log in at sleeper.com once in a
   browser and copy the number from the address bar, or use the username search below.
-- **Don't know it?** Open "Don't know your league ID?" in the app's sidebar and type your
-  Sleeper username. It lists your leagues and their IDs.
+- **Don't know it?** Type your Sleeper username into the "Don’t know the ID?" box instead.
+  It lists your leagues; click yours.
 
-Then pick **your team** from the list below it.
+Then pick **your team**. The app remembers your league next time.
 
 ## 4. Use it
 
-- **Grade a trade:** choose the other team, pick the players you'd give and get, and press
+- **Grade a trade:** choose the other team, tap the players you'd give and get, and press
   *Grade this trade*. *Quick* takes about 5 seconds; *Full* is more precise and takes
   about 15. You get:
   - a verdict: take it, pass, or close to even;
@@ -74,11 +75,14 @@ Then pick **your team** from the list below it.
 - **Your league:** everyone's playoff and title odds today, and trades already made in
   your league.
 - **Find trades:** searches every roster for deals that raise both teams' title odds.
-  It takes about a minute.
+  It takes a minute or two. Click any result to grade it in detail.
 - **How accurate is it?:** the accuracy report, measured on real past seasons.
 
 Optional: if you want FantasyPros projections in the mix, download a weekly projections
-CSV from fantasypros.com and drop it in on the *Your league* page.
+CSV from fantasypros.com and add it on the *Your league* page. The app uses it until you
+stop the app.
+
+On a phone or another computer? The app only runs on the computer you started it on.
 
 ## Command line (optional)
 
@@ -104,6 +108,13 @@ Run the tests (offline):
 
 ```bash
 uv run pytest
+```
+
+Changing the app's screens (the `web/` folder) needs Node.js; most people never do this.
+After an edit, rebuild them:
+
+```bash
+cd web && npm install && npm run build
 ```
 
 ## Good to know

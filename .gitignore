@@ -9,3 +9,7 @@ data/
 *.cookies
 .DS_Store
 .streamlit/secrets.toml
+
+# frontend: dependencies stay local; web/dist (the built app) IS committed
+web/node_modules/
+*.tsbuildinfo

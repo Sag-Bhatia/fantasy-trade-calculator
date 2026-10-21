@@ -159,7 +159,10 @@ need. Screen survivors at 1,000 sims (CRN), re-run the top 10 at 10,000, return 
 with both Δ title % > 0 beyond 1 SE, ranked by the smaller of the two gains.
 Budget: < 2 min for a 12-team league.
 
-## 10. UI (Streamlit, `app.py` + `pages/`)
+## 10. UI (React + FastAPI: `ffcalc/api.py`, `web/`)
+
+`uv run python -m ffcalc serve` starts one local server (127.0.0.1:8000) that serves the
+HTTP API (`docs/api.md`) and the built React app (`web/dist`, committed). Screens:
 
 1. **League** — paste Sleeper league ID (or username → pick league), pick my team.
    Shows format, scoring summary, roster slots, current standings.
@@ -167,8 +170,11 @@ Budget: < 2 min for a 12-team league.
    decomposition bar, weekly score distributions, market check, acceptance heuristic.
 3. **Trade finder** — runs §9, lists suggestions.
 4. **Accuracy** — renders REPORT.md.
-Cache data and sim results with `st.cache_data` keyed on inputs, so widget clicks don't
-re-fetch or re-simulate. Optional FantasyPros CSV upload on the League page.
+5. **Welcome** — league ID or username lookup, then pick your team (remembered locally).
+The server caches each league's prepared context for 10 minutes (one build at a time per
+league); grades and finder runs stream progress as NDJSON. Optional FantasyPros CSV upload
+on the League page (kept in memory until the server stops). Originally Streamlit; rebuilt
+on the user's request (NOTES.md).
 
 ## 11. Backtesting and calibration (`backtest.py` → REPORT.md)
 
@@ -193,7 +199,8 @@ hand-edit or invent numbers. Every number states its sample size.
 ## 12. Layout
 
 ```
-app.py, pages/            Streamlit UI
+ffcalc/api.py             HTTP API (FastAPI) + serves web/dist
+web/                      React + Vite + Tailwind app; web/dist is the committed build
 ffcalc/__main__.py        CLI (argparse)
 ffcalc/cache.py           TTL disk cache + snapshots
 ffcalc/clients/           sleeper.py espn.py fantasycalc.py nflverse.py fantasypros_csv.py

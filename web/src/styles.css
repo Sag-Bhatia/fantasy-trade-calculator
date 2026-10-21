@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/* Trading-card pop: you = cobalt, them = tangerine, volt = the main action. */
+@theme {
+  --color-court: #f4f5fa;
+  --color-ink: #12131c;
+  --color-muted: #4a4d5e;
+  --color-line: #e6e8f2;
+  --color-you: #3557ff;
+  --color-you-deep: #1d3bd6;
+  --color-you-tint: #e9edff;
+  --color-them: #ff7a1f;
+  --color-them-deep: #a64300;
+  --color-them-tint: #ffe9da;
+  --color-volt: #d4ff3a;
+  --color-up: #087a46;
+  --color-up-bright: #2bd67b;
+  --color-up-tint: #c8f5dc;
+  --color-down: #d21f42;
+  --color-down-bright: #ff5c7a;
+  --color-down-tint: #ffd6de;
+  --font-display: "Unbounded", system-ui, sans-serif;
+  --font-sans: "DM Sans", system-ui, sans-serif;
+}
+
+@layer base {
+  html { background: var(--color-court); color: var(--color-ink); }
+  body { margin: 0; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  :focus-visible { outline: 3px solid var(--color-you); outline-offset: 2px; }
+  button { cursor: pointer; }
+}
+
+@layer components {
+  /* the sticker: ink outline + hard offset shadow; presses in when clicked */
+  .sticker { border: 2.5px solid var(--color-ink); box-shadow: 4px 4px 0 var(--color-ink); }
+  .sticker-lg { border: 2.5px solid var(--color-ink); box-shadow: 6px 6px 0 var(--color-ink); }
+  .press { transition: transform 80ms ease, box-shadow 80ms ease; }
+  .press:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--color-ink); }
+  .num { font-family: var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .jersey { background: repeating-linear-gradient(135deg, var(--c1) 0 8px, var(--c2) 8px 11px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .press, .press:active { transition: none; }
+}
+
+/* REPORT.md on the accuracy page */
+.report { line-height: 1.6; font-size: 16px; }
+.report h2 { font-family: var(--font-display); font-weight: 800; font-size: 24px; margin: 28px 0 10px; }
+.report h2:first-child { margin-top: 0; }
+.report p, .report ul { margin: 10px 0; max-width: 72ch; }
+.report ul { padding-left: 22px; }
+.report code { font-size: 14px; background: var(--color-court); padding: 1px 5px; border-radius: 6px; }
+.report pre { background: var(--color-court); padding: 12px; border-radius: 12px; overflow-x: auto; font-size: 13px; }
+.report table { border-collapse: collapse; margin: 14px 0; display: block; overflow-x: auto; max-width: 100%; }
+.report th, .report td { border: 2px solid var(--color-ink); padding: 7px 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.report th:first-child, .report td:first-child { text-align: left; }
+.report th { background: var(--color-volt); font-weight: 700; }

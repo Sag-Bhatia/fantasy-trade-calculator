@@ -54,6 +54,34 @@ def evaluate(args: argparse.Namespace) -> int:
     return 0
 
 
+def serve(args: argparse.Namespace) -> int:
+    import threading
+    import time
+    import webbrowser
+
+    import uvicorn
+
+    from ffcalc.api import app
+
+    url = f"http://localhost:{args.port}"
+    server = uvicorn.Server(
+        uvicorn.Config(app, host="127.0.0.1", port=args.port, log_level="warning")
+    )
+
+    def open_when_up() -> None:
+        for _ in range(300):  # give up after ~30 s
+            if server.started:
+                webbrowser.open(url)
+                return
+            time.sleep(0.1)
+
+    if not args.no_browser:
+        threading.Thread(target=open_when_up, daemon=True).start()
+    print(f"Trade calculator running at {url} (press Ctrl+C to stop)")
+    server.run()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.ERROR)
     ap = argparse.ArgumentParser(prog="ffcalc", description="Fantasy football trade calculator")
@@ -77,7 +105,13 @@ def main(argv: list[str] | None = None) -> int:
     hi = sub.add_parser("history", help="build variance, correlation and injury tables")
     hi.add_argument("--league", required=True, help="tables use this league's scoring")
 
+    sv = sub.add_parser("serve", help="run the web app")
+    sv.add_argument("--port", type=int, default=8000)
+    sv.add_argument("--no-browser", action="store_true", help="don't open the browser")
+
     args = ap.parse_args(argv)
+    if args.cmd == "serve":
+        return serve(args)
     if args.cmd == "evaluate":
         return evaluate(args)
     if args.cmd == "find":
