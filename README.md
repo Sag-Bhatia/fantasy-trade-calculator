@@ -86,6 +86,40 @@ stop the app.
 
 On a phone or another computer? The app only runs on the computer you started it on.
 
+## Put it online for free (optional)
+
+So your league-mates can use it without installing anything, host it on **Hugging Face
+Spaces** (free, no credit card). The Space downloads this app from GitHub and runs it.
+
+1. Make a free account at [huggingface.co](https://huggingface.co/join).
+2. Go to [huggingface.co/new-space](https://huggingface.co/new-space) and fill in:
+   - **Space name:** for example `trade-calculator`
+   - **License:** MIT
+   - **Select the Space SDK:** **Docker**, then the **Blank** template
+   - **Space hardware:** **CPU basic** (free)
+   - **Public** if anyone with the link may use it, **Private** if only you
+
+   Then press **Create Space**.
+3. On your new Space, open **Files**, choose **+ Contribute → Create a new file**, name it
+   `Dockerfile`, and paste in everything from
+   [deploy/huggingface/Dockerfile](deploy/huggingface/Dockerfile) (open it on GitHub, press
+   **Raw**, select all, copy). Press **Commit new file to main**.
+4. The Space starts building. Watch the **Logs** tab: the first build takes about 5–10
+   minutes, because it also learns from four past seasons. When it says **Running**, the
+   **App** tab shows the trade calculator. Share the address that looks like
+   `https://<your-name>-trade-calculator.hf.space`.
+
+Good to know about the online copy:
+
+- **Updates:** after new changes reach GitHub, open the Space's **Settings** and press
+  **Factory rebuild** to pick them up.
+- **Sleeping:** after 2 days with no visitors the Space goes to sleep; the next visitor
+  wakes it, which takes a few minutes.
+- **Other leagues:** the build pre-learns past seasons for this league's scoring. A league
+  with different scoring takes 2–3 minutes the first time it's loaded.
+- At most two grades or searches run at once; anyone else waits their turn. Adding a
+  FantasyPros file only works when you run the app on your own computer.
+
 ## Command line (optional)
 
 ```bash
