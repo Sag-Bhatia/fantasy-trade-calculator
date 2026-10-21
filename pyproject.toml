@@ -1,0 +1,40 @@
+[project]
+name = "ffcalc"
+version = "0.1.0"
+description = "Fantasy football trade calculator: Monte Carlo season sim for Sleeper leagues"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "nflreadpy>=0.1.5",
+    "numpy>=2.5.4",
+    "polars>=2.0.0",
+    "streamlit>=1.66.0",
+    "truststore>=0.10.5",
+]
+
+[tool.uv]
+package = false
+system-certs = true  # this Mac uses a TLS-inspecting proxy; uv must trust system certs
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = ["slow: timing/perf tests (deselect with -m 'not slow')"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "NPY"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+]
