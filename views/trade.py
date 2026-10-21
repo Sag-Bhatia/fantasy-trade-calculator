@@ -36,7 +36,7 @@ get = c2.multiselect(
 )
 c3, c4 = st.columns([2, 1], vertical_alignment="bottom")
 depth = c3.radio("How many seasons to simulate", list(ui.SIM_CHOICES), horizontal=True,
-                 help="Full is more precise and takes about half a minute.")  # fmt: skip
+                 help="Full is more precise and takes about 15 seconds.")  # fmt: skip
 go = c4.button("Grade this trade", type="primary", disabled=not (give or get), width="stretch")
 
 key = (

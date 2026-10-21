@@ -54,9 +54,9 @@ def test_missing_league():
 
 
 def test_find_leagues():
-    out = find_leagues("quickbunt06", 2026, FakeSleeper())
+    out = find_leagues("manager01", 2026, FakeSleeper())
     assert out == [{"league_id": LID, "name": out[0]["name"], "total_rosters": 14}]
-    assert find_leagues("quickbunt06", 2020, FakeSleeper()) == []
+    assert find_leagues("manager01", 2020, FakeSleeper()) == []
 
 
 def test_find_leagues_unknown_user():

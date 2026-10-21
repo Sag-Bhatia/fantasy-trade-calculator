@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -34,6 +35,12 @@ class Context:
     warnings: list[str] = field(default_factory=list)
     market: pl.DataFrame = field(default_factory=pl.DataFrame)  # FantasyCalc values (may be empty)
     src: Any = None
+    loaded_at: float = field(default_factory=time.time)
+
+    @property
+    def key(self) -> str:
+        """Identifies this load of the league, for caching results computed from it."""
+        return f"{self.league.league_id}:{self.loaded_at}"
 
     def ids_of(self, idx: np.ndarray) -> list[str]:
         return [self.inputs.ids[i] for i in idx]

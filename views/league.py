@@ -13,7 +13,7 @@ ui.league_header(ctx)
 
 st.subheader("Where everyone stands")
 with st.spinner("Simulating the rest of the season"):
-    odds = ui.league_odds(id(ctx), ctx)
+    odds = ui.league_odds(ctx.key, ctx)
 st.dataframe(
     odds.drop("roster_id").with_columns(pl.col("Playoff odds") * 100, pl.col("Title odds") * 100),
     height=36 * (odds.height + 1) + 3,

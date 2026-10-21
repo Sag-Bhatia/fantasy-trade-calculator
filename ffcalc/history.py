@@ -24,7 +24,7 @@ from scipy.special import ndtri
 from . import cache
 from .clients.sleeper import stat_frame
 from .models import POSITIONS, ROLE_DEPTH, ROLES
-from .scoring import score_lines
+from .scoring import STANDARD_PPR, points, score_lines
 from .simulate import NPOS, NROLES, QGRID, Tables
 
 log = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ TIERS = 5
 MAX_OUT = 8  # longest absence tracked; longer ones are counted as 8
 SHRINK = 150  # correlation shrinkage toward 0: n / (n + SHRINK)
 STATUSES = ("Questionable", "Doubtful", "Out")
-# Projected points (any scoring) below which a player-week isn't fantasy-relevant.
+# Projected points (league scoring) below which a player-week isn't fantasy-relevant.
 MIN_PROJ = {"QB": 8.0, "RB": 4.0, "WR": 4.0, "TE": 3.0, "K": 4.0, "DEF": 3.0}
 
 _META = {
@@ -56,7 +56,7 @@ def _meta(rows: list[dict], kind: str) -> pl.DataFrame:
         if pos not in POSITIONS:
             continue
         st = r.get("stats") or {}
-        if kind == "proj" and (st.get("pts_ppr") or 0) < 0.5:
+        if kind == "proj" and points(st, STANDARD_PPR) < 0.5:  # relevance gate only
             continue
         played = bool(st.get("gp")) or (pos == "DEF" and r.get("game_id") is not None)
         if kind == "stats" and not played:

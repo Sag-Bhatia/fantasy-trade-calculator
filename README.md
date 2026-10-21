@@ -1,7 +1,7 @@
 # Fantasy Football Trade Calculator
 
 Tells you whether a trade in your **Sleeper** league is worth making. It plays out the
-rest of your season 10,000 times with the trade and 10,000 times without it, using your
+rest of your season thousands of times with the trade and without it, using your
 league's real rosters, scoring, schedule, playoff format and free agents. Then it shows
 how your title odds and playoff odds change, and why.
 

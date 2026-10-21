@@ -66,7 +66,9 @@ def _ros(ctx: Context) -> np.ndarray:
 
 
 def _expected_lineup(ctx: Context, roster: np.ndarray) -> float:
-    """Playoff-weighted expected starting points, everyone healthy as projected (fast)."""
+    """Playoff-weighted expected starting points, everyone healthy as projected (fast).
+    Players known to be out (IR, Out) don't count."""
+    roster = roster[ctx.inputs.out_weeks[roster] == 0]
     e = ctx.inputs.expected[roster]  # (n, W)
     pos = ctx.inputs.pos[roster]
     ww = week_weights(ctx)
@@ -117,7 +119,10 @@ def candidates(ctx: Context, me: int) -> list[Trade]:
 
 
 def _need_filter(ctx: Context, trades: list[Trade]) -> list[tuple[float, Trade]]:
-    """Keep trades that improve both teams' expected lineups (before roster moves)."""
+    """Keep trades that improve both teams' expected lineups.
+
+    shortcut: ignores the trade's own pickup/cut (apply_trade is ~100x slower); a few
+    trades that only pay off after the pickup are pruned. Upgrade if the finder gets faster."""
     base = {}
     kept = []
     for tr in trades:
@@ -165,6 +170,7 @@ def find_trades(
     progress("Listing possible deals")
     cands = candidates(ctx, me)
     progress(f"Checking positional fit for {len(cands):,} deals")
+    # shortcut: only the 3 × SCREEN_KEEP best positional fits are simulated (runtime budget)
     fit = _need_filter(ctx, cands)[: SCREEN_KEEP * 3]
     if not fit:
         return []
@@ -195,9 +201,9 @@ def find_trades(
         da, db, pa, pb, xa, xb = _deltas(ctx, out, tp_base, base_res, tr, cfg)
         if da.value > da.se and db.value > db.se:
             gap = None
-            if val:
-                give = sum(val.get(p, 0) for p in tr.a_gives)
-                get = sum(val.get(p, 0) for p in tr.b_gives)
+            if val and all(val.get(p, 0) > 0 for p in tr.a_gives + tr.b_gives):
+                give = sum(val[p] for p in tr.a_gives)
+                get = sum(val[p] for p in tr.b_gives)
                 gap = (get - give) / give if give else None
             found.append(Suggestion(tr, da, db, pa, pb, xa, xb, moves, gap))
     found.sort(key=lambda s: -min(s.a_title.value, s.b_title.value))

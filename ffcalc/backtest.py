@@ -101,7 +101,9 @@ def inhouse_points(src: Any, season: int, scoring: Mapping[str, float], acts: di
             }
         )
     trained = model.train(
-        pl.concat([acts[s] for s in prior], how="diagonal_relaxed"), implied, prior
+        pl.concat([acts[s] for s in prior], how="diagonal_relaxed"),
+        implied.filter(pl.col("season").is_in(prior)),
+        prior,
     )
     out = []
     act = acts[season]
@@ -451,10 +453,9 @@ def _replay_trades(rng: np.random.Generator, sd: SeasonData, lg: League, inp: Si
         new = [r.copy() for r in cfg.rosters]
         new[a] = np.array([i for i in new[a] if i != index[pa]] + [index[pb]], np.intp)
         new[b] = np.array([i for i in new[b] if i != index[pb]] + [index[pa]], np.intp)
-        tb = team_points(out, inp, Config([cfg.rosters[a]], cfg.fa_pool), lg.slots)[:, 0][
-            :, regular
-        ]
-        ta = team_points(out, inp, Config([new[a]], cfg.fa_pool), lg.slots)[:, 0][:, regular]
+        none = np.array([], np.intp)  # the realized side has no free agents either
+        tb = team_points(out, inp, Config([cfg.rosters[a]], none), lg.slots)[:, 0][:, regular]
+        ta = team_points(out, inp, Config([new[a]], none), lg.slots)[:, 0][:, regular]
         predicted = float((ta - tb).sum(1).mean())
         realized = _real_gain(sd, lg, [rosters[a], [*[p for p in rosters[a] if p != pa], pb]], n)
         res.append((season, k, n, predicted, realized))
@@ -554,10 +555,12 @@ def write_report(
         "",
         "## 1. Projection accuracy (mean absolute error, fantasy points per player-week)",
         "",
-        f"Seasons {', '.join(map(str, EVAL_SEASONS))}, weeks 1–18, fantasy-relevant player-weeks that played, "
+        f"Seasons {', '.join(map(str, EVAL_SEASONS))} (2022 is only used for learning), fantasy-relevant player-weeks that played; "
+        "weeks 3–18 for QB/RB/WR/TE (the in-house model needs two games of history) and 1–18 for K/DEF, "
         "one common sample per position (rows where every listed source had a projection). "
         "Scored with standard full-PPR settings. Lower is better. "
-        "`blend` uses inverse-MAE weights learned only from earlier seasons (equal weights in the first season). "
+        "`blend` is the inverse-MAE weighted mean of the sources' points, with weights learned only from earlier seasons "
+        "(equal in the first season); the app blends each stat line before scoring, which is very close but not identical. "
         "`season_avg` / `last3` are naive baselines: the player's average actual points so far this season / over his last 3 games "
         "(so a player's first game of each season is excluded from the common sample). "
         "ESPN isn't used for K or DEF (its stat ids for those are unverified); the in-house model covers QB/RB/WR/TE.",
@@ -580,7 +583,11 @@ def write_report(
         "## 3. Simulator calibration (playoff odds)",
         "",
     ]
-    if league is not None and league.previous_league_id:
+    if league is None:
+        lines.append(
+            "**The test league couldn't be loaded, so its history wasn't checked; this uses the synthetic-league fallback** (spec §11.3)."
+        )
+    elif league.previous_league_id:
         lines.append(
             f"League history exists (previous_league_id {league.previous_league_id}) but replaying it is not built; synthetic leagues used."
         )
@@ -623,7 +630,8 @@ def write_report(
         "rest-of-regular-season starter points; we check whether team A really gained points (real lineups, real scores).",
         "",
         f"- Trades replayed: **{tr.height:,}**",
-        f"- Model picked the side that really gained points: **{hit:.1%}** (± {se:.1%} SE; 50% = coin flip)",
+        f"- Model picked the side that really gained points: **{hit:.1%}** (± {se:.1%} SE if the trades were independent; "
+        "they share leagues and weeks, so the true uncertainty is somewhat larger; 50% = coin flip)",
         f"- When the model predicted a gap of at least 10 points: **{hit_big:.1%}** of {big.height:,} trades",
         f"- Correlation of predicted vs realized gain: {float(np.corrcoef(tr['predicted'], tr['realized'])[0, 1]) if tr.height > 2 else float('nan'):.3f}",
         "",
@@ -632,6 +640,10 @@ def write_report(
         "- Real leagues have waivers, trades and managers who don't always start their best lineup; the synthetic leagues don't.",
         "- FantasyCalc market values have no history, so the market check and acceptance heuristic are not backtested.",
         "- ESPN K/DEF and the FantasyPros CSV are not part of the accuracy comparison.",
+        "- Archived Sleeper and ESPN projections are assumed to be the ones published before each week; if a source "
+        "rewrote them later, its accuracy here would look better than it was.",
+        "- Synthetic leagues are drafted from noisy week-1 projections (no historical ADP), and 2021 and earlier aren't used.",
+        "- Standard errors and Brier scores treat team-snapshots and trades as independent, though they share leagues and weeks.",
     ]
     text = "\n".join(lines) + "\n"
     with open(path, "w") as f:

@@ -16,7 +16,7 @@ st.markdown(
 )
 if st.button("Find trades for my team", type="primary"):
     with ui.friendly_errors(), st.status("Searching", expanded=True) as s:
-        found = ui.run_finder(id(ctx), ctx, me, lambda m: s.write(m))
+        found = ui.run_finder(ctx.key, ctx, me, lambda m: s.write(m))
         n = len(found)
         s.update(label=f"Found {n} trade{'s' if n != 1 else ''}", state="complete", expanded=False)
     st.session_state["found"] = (ctx.league.league_id, me, found)

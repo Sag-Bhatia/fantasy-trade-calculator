@@ -137,7 +137,7 @@ def context(league_id: str, status_label: str = "Loading your league") -> engine
 
 
 @st.cache_resource(show_spinner=False, ttl=600, max_entries=4)
-def league_odds(ctx_id: int, _ctx: engine.Context, sims: int = 3_000) -> pl.DataFrame:
+def league_odds(ctx_key: str, _ctx: engine.Context, sims: int = 3_000) -> pl.DataFrame:
     """Current playoff/title odds for every team (no trade)."""
     out = simulate_players(_ctx.inputs, _ctx.tables, sims, 7)
     res = simulate_league(out, _ctx.inputs, _ctx.league, _ctx.base)
@@ -159,7 +159,7 @@ def league_odds(ctx_id: int, _ctx: engine.Context, sims: int = 3_000) -> pl.Data
 
 
 @st.cache_resource(show_spinner=False, ttl=600, max_entries=8)
-def run_trade(ctx_id: int, _ctx: engine.Context, team_a: int, team_b: int,
+def run_trade(ctx_key: str, _ctx: engine.Context, team_a: int, team_b: int,
               give: tuple[str, ...], get: tuple[str, ...], sims: int,
               _progress: Callable[[str], None] = lambda _: None) -> TradeResult:  # fmt: skip
     return evaluate(
@@ -171,7 +171,7 @@ def evaluate_trade(ctx: engine.Context, team_a: int, team_b: int, give: list[str
                    sims: int) -> TradeResult | None:  # fmt: skip
     with st.status("Grading the trade", expanded=True) as s:
         try:
-            res = run_trade(id(ctx), ctx, team_a, team_b, tuple(sorted(give)),
+            res = run_trade(ctx.key, ctx, team_a, team_b, tuple(sorted(give)),
                             tuple(sorted(get)), sims, lambda m: s.write(m))  # fmt: skip
         except TradeError as e:
             s.update(label="This trade can't be graded", state="error")
@@ -514,6 +514,12 @@ def find_league(username: str) -> None:
     except ValueError as e:
         st.error(str(e))
         return
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            st.write("No Sleeper user with that name. Check the spelling.")
+        else:
+            st.error("Sleeper didn't answer. Try again in a minute.")
+        return
     except Exception:
         st.error("Sleeper didn't answer. Try again in a minute.")
         return
@@ -528,14 +534,14 @@ def welcome() -> None:
     st.title("Grade a fantasy football trade")
     st.markdown(
         "Paste your Sleeper league ID in the sidebar. The calculator plays out the rest of "
-        "your season 10,000 times with and without a trade, using your league's real "
+        "your season thousands of times with and without a trade, using your league's real "
         "rosters, scoring, schedule, playoff format and free agents, then tells you how your "
         "title and playoff odds change and why."
     )
     st.markdown(
         "**Finding your league ID:** open your league on sleeper.com. The web address ends in "
         "a long number, like `sleeper.com/leagues/1400221038771437568`. That number is the ID. "
-        "In the app, it's under League settings."
+        'Or type your Sleeper username under "Don\'t know your league ID?" in the sidebar.'
     )
 
 
@@ -563,7 +569,7 @@ def numbers_table(res: TradeResult) -> None:
 
 
 @st.cache_resource(show_spinner=False, ttl=600, max_entries=8)
-def run_finder(ctx_id: int, _ctx: engine.Context, team: int,
+def run_finder(ctx_key: str, _ctx: engine.Context, team: int,
                _progress: Callable[[str], None] = lambda _: None) -> list[Any]:  # fmt: skip
     from .finder import find_trades
 
