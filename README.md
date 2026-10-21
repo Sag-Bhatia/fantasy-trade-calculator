@@ -100,7 +100,8 @@ Spaces** (free, no credit card). The Space downloads this app from GitHub and ru
    - **Public** if anyone with the link may use it, **Private** if only you
 
    Then press **Create Space**.
-3. On your new Space, open **Files**, choose **+ Contribute → Create a new file**, name it
+3. On your new Space, open **Files**, choose **Add file** (it may say **+ Contribute**) →
+   **Create a new file**, name it
    `Dockerfile`, and paste in everything from
    [deploy/huggingface/Dockerfile](deploy/huggingface/Dockerfile) (open it on GitHub, press
    **Raw**, select all, copy). Press **Commit new file to main**.
