@@ -498,7 +498,15 @@ def reliability(df: pl.DataFrame) -> pl.DataFrame:
             pl.len().alias("n"),
         )
         .sort("bin")
-    )
+        .select(
+            (pl.col("bin") * 10).cast(pl.String).alias("lo"),
+            ((pl.col("bin") + 1) * 10).cast(pl.String).alias("hi"),
+            "predicted", "actual", "n",
+        )
+        .select(pl.concat_str("lo", pl.lit("–"), "hi", pl.lit("%")).alias("model said"),
+                pl.col("predicted").alias("average forecast"),
+                pl.col("actual").alias("actually made playoffs"), "n")
+    )  # fmt: skip
 
 
 def _md(df: pl.DataFrame, fmt: Mapping[str, str] | None = None) -> str:
@@ -507,7 +515,7 @@ def _md(df: pl.DataFrame, fmt: Mapping[str, str] | None = None) -> str:
     lines = ["| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
     for row in df.iter_rows():
         cells = [
-            format(v, fmt.get(c, "")) if isinstance(v, float) else str(v)
+            "—" if v is None else format(v, fmt.get(c, "")) if isinstance(v, float) else str(v)
             for c, v in zip(cols, row, strict=True)
         ]
         lines.append("| " + " | ".join(cells) + " |")
@@ -606,7 +614,7 @@ def write_report(
         "",
         "Reliability (when the model says X%, how often did it happen?):",
         "",
-        _md(reliability(p), {"predicted": ".3f", "actual": ".3f"}),
+        _md(reliability(p), {"average forecast": ".3f", "actually made playoffs": ".3f"}),
         "",
         "## 4. Trade replay",
         "",
