@@ -80,6 +80,23 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     if args.cmd == "evaluate":
         return evaluate(args)
+    if args.cmd == "find":
+        from ffcalc import engine
+        from ffcalc.finder import find_trades
+
+        ctx = engine.prepare(args.league, progress=lambda m: print(f"… {m}", file=sys.stderr))
+        found = find_trades(ctx, args.team, progress=lambda m: print(f"… {m}", file=sys.stderr))
+        if not found:
+            print("No trade clearly raises both teams' title odds right now.")
+        for s in found:
+            partner = ctx.league.team(s.trade.team_b).name
+            print(
+                f"{partner}: give {', '.join(ctx.name(p) for p in s.trade.a_gives)}"
+                f" for {', '.join(ctx.name(p) for p in s.trade.b_gives)}"
+                f"  | your title odds {s.a_title.value * 100:+.1f} ± {s.a_title.se * 100:.1f} pts,"
+                f" theirs {s.b_title.value * 100:+.1f} ± {s.b_title.se * 100:.1f} pts"
+            )
+        return 0
     if args.cmd == "teams":
         from ffcalc.league import load_league
         from ffcalc.sources import live
