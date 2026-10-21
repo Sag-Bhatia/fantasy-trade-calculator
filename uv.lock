@@ -287,6 +287,7 @@ name = "ffcalc"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "altair" },
     { name = "httpx" },
     { name = "nflreadpy" },
     { name = "numpy" },
@@ -305,6 +306,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "altair", specifier = ">=6.3.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "nflreadpy", specifier = ">=0.1.5" },
     { name = "numpy", specifier = ">=2.5.4" },
