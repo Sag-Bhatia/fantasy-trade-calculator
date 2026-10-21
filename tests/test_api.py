@@ -369,3 +369,28 @@ def test_heavy_jobs_wait_their_turn(client, monkeypatch):
     lines = out[0]
     assert lines[0] == {"type": "progress", "message": "Waiting for another search to finish"}
     assert lines[-1]["type"] == "result"
+
+
+def test_vercel_entry_moves_build_data_to_tmp(tmp_path, monkeypatch):
+    import os
+    import runpy
+    import shutil
+    import tempfile
+
+    repo = tmp_path / "repo"
+    cached = repo / "data" / "cache" / "players.json"
+    cached.parent.mkdir(parents=True)
+    cached.write_text("{}")
+    os.utime(cached, (1, 1))
+    cached.parent.chmod(0o555)  # the deployed bundle is read-only
+    shutil.copy(Path(__file__).resolve().parent.parent / "app.py", repo)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("FFCALC_")}
+    monkeypatch.setattr(os, "environ", env)
+    monkeypatch.setattr(os, "access", lambda *a, **k: False)  # read-only, like Vercel
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path / "tmp"))
+    assert runpy.run_path(str(repo / "app.py"))["app"] is api.app
+    work = tmp_path / "tmp" / "ffcalc"
+    assert env["FFCALC_DATA"] == str(work) and env["FFCALC_HOSTED"] == "1"
+    # file age kept, so a players list from build time still counts as stale after a day
+    assert (work / "cache" / "players.json").stat().st_mtime == 1
+    (work / "cache" / "new.json").write_text("{}")  # and the copy can take new caches

@@ -88,38 +88,34 @@ On a phone or another computer? The app only runs on the computer you started it
 
 ## Put it online for free (optional)
 
-So your league-mates can use it without installing anything, host it on **Hugging Face
-Spaces** (free, no credit card). The Space downloads this app from GitHub and runs it.
+So your league-mates can use it without installing anything, host it on **Vercel**'s free
+Hobby plan (no credit card). Vercel copies this app from your GitHub repo and runs it.
 
-1. Make a free account at [huggingface.co](https://huggingface.co/join).
-2. Go to [huggingface.co/new-space](https://huggingface.co/new-space) and fill in:
-   - **Space name:** for example `trade-calculator`
-   - **License:** MIT
-   - **Select the Space SDK:** **Docker**, then the **Blank** template
-   - **Space hardware:** **CPU basic** (free)
-   - **Public** if anyone with the link may use it, **Private** if only you
-
-   Then press **Create Space**.
-3. On your new Space, open **Files**, choose **Add file** (it may say **+ Contribute**) →
-   **Create a new file**, name it
-   `Dockerfile`, and paste in everything from
-   [deploy/huggingface/Dockerfile](deploy/huggingface/Dockerfile) (open it on GitHub, press
-   **Raw**, select all, copy). Press **Commit new file to main**.
-4. The Space starts building. Watch the **Logs** tab: the first build takes about 5–10
-   minutes, because it also learns from four past seasons. When it says **Running**, the
-   **App** tab shows the trade calculator. Share the address that looks like
-   `https://<your-name>-trade-calculator.hf.space`.
+1. Go to [vercel.com/signup](https://vercel.com/signup), choose **Hobby**, and sign up with
+   **Continue with GitHub** (the account that owns this repo).
+2. On your Vercel dashboard, press **Add New…** → **Project**. Find
+   `fantasy-trade-calculator` under **Import Git Repository** and press **Import**. If it
+   isn't listed, press **Adjust GitHub App Permissions** and give Vercel access to it.
+3. Leave every setting as it is (Vercel reads `vercel.json` and `pyproject.toml` from the
+   repo) and press **Deploy**.
+4. The first build takes about 5 minutes, because it also learns from four past seasons.
+   When it shows **Congratulations**, press **Continue to Dashboard**, then **Visit**.
+   Share that address; it looks like `https://fantasy-trade-calculator.vercel.app`.
 
 Good to know about the online copy:
 
-- **Updates:** after new changes reach GitHub, open the Space's **Settings** and press
-  **Factory rebuild** to pick them up.
-- **Sleeping:** after 2 days with no visitors the Space goes to sleep; the next visitor
-  wakes it, which takes a few minutes.
+- **Updates:** every push to GitHub's `main` branch redeploys it by itself.
+- **Monthly allowance:** the free plan includes 4 hours of computing a month, about 800
+  trade grades or 190 "Find trades" searches. If it runs out, the site pauses until the
+  next month. You're never charged.
+- **Waking up:** after a quiet stretch the first visit takes a few extra seconds while
+  Vercel starts a fresh copy.
 - **Other leagues:** the build pre-learns past seasons for this league's scoring. A league
-  with different scoring takes 2–3 minutes the first time it's loaded.
-- At most two grades or searches run at once; anyone else waits their turn. Adding a
+  with different scoring takes 2–3 minutes the first time a fresh copy loads it.
+- Each copy runs one grade or search at a time; anyone else waits their turn. Adding a
   FantasyPros file only works when you run the app on your own computer.
+- Any host that runs Docker (for example Hugging Face Spaces on its paid PRO plan) can use
+  [deploy/huggingface/Dockerfile](deploy/huggingface/Dockerfile) instead.
 
 ## Command line (optional)
 

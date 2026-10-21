@@ -42,9 +42,10 @@ build_history = True
 DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 CACHE_SECONDS = 600
 SIM_CHOICES = (3_000, 10_000)
-# a shared public copy (e.g. Hugging Face): uploads would change everyone's numbers, so they're off
+# a shared public copy online: uploads would change everyone's numbers, so they're off
 HOSTED = os.environ.get("FFCALC_HOSTED") == "1"
-HEAVY_JOBS = 2  # grades/searches at once; each uses about one CPU core and up to ~1 GB
+# grades/searches at once; each uses about one CPU core and up to ~1 GB
+HEAVY_JOBS = int(os.environ.get("FFCALC_HEAVY_JOBS", "2"))
 _heavy = threading.BoundedSemaphore(HEAVY_JOBS)
 ODDS_SIMS = 3_000
 DOWN = "A data source didn't answer. Try again in a minute."

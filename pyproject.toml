@@ -18,6 +18,9 @@ dependencies = [
 package = false
 system-certs = true  # this Mac uses a TLS-inspecting proxy; uv must trust system certs
 
+[tool.vercel.scripts]
+build = "python app.py"  # runs after Vercel installs dependencies (README: Put it online)
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
