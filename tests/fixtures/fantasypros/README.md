@@ -1,0 +1,1 @@
+FORMAT SAMPLES ONLY: the numbers in these CSVs are made up to show the column layouts of FantasyPros projection exports (names/teams are real players, stats are not projections). Never use them as data.

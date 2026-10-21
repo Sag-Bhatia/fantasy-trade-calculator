@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 
 POSITIONS = ("QB", "RB", "WR", "TE", "K", "DEF")
 
+# Correlation roles: a player's depth rank at his position on his NFL team that week.
+ROLES = ("QB1", "RB1", "RB2", "WR1", "WR2", "WR3", "TE1", "K", "DEF")
+ROLE_DEPTH = {"QB": 1, "RB": 2, "WR": 3, "TE": 1, "K": 1, "DEF": 1}
+
 # Sleeper roster slot → positions that may fill it.
 SLOT_ELIGIBILITY: dict[str, tuple[str, ...]] = {
     "QB": ("QB",),
