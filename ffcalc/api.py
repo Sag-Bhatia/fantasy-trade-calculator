@@ -329,7 +329,8 @@ def _add_fantasypros(league_id: str, body: bytes, week: int) -> dict[str, Any]:
 
 @app.delete("/api/league/{league_id}/fantasypros")
 def remove_fantasypros(league_id: str) -> dict[str, Any]:
-    key, lock = _lock(league_id)
+    with friendly():  # a malformed id → 404, like every other route
+        key, lock = _lock(league_id)
     with lock:
         if _fp.pop(key, None) is not None:
             _cache.pop(key, None)

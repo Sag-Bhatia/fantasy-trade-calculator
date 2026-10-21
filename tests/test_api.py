@@ -292,6 +292,10 @@ def test_balance_stream_describes_each_change(client):
         assert set(o) >= {"partner", "get", "me", "them", "moves"}
 
 
+def test_fantasypros_remove_with_a_bad_league_id_is_404(client):
+    assert client.delete("/api/league/abc/fantasypros").status_code == 404
+
+
 def test_balance_rejects_a_bad_trade(client):
     body = {"league_id": LEAGUE, "team": ME, "partner": ME, "give": [], "get": []}
     assert client.post("/api/balance", json=body).status_code == 422

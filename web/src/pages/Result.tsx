@@ -31,7 +31,11 @@ export function Result() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (recall(key)) return;
+    // the page stays mounted when only the trade in the URL changes: never show the last one's numbers
+    const hit = recall<GradeResult>(key);
+    setResult(hit);
+    setError("");
+    if (hit) return;
     let live = true;
     setSteps([]);
     api
@@ -462,7 +466,7 @@ function MakeFair({ trade, base, partnerName }: { trade: TradeRequest; base: str
       {error && <ErrorNote>{error}</ErrorNote>}
       {found && found.offers.length === 0 && (
         <p className="text-[16px]">
-          None of the {found.tried} one-player changes we tried helps both teams by more than the margin of error.{" "}
+          We tried {found.tried} one-player changes and checked the most promising ones with 10,000 seasons. None helps both teams by more than the margin of error.{" "}
           <Link to={`${base}/find`} className="font-bold text-you underline">
             Find trades
           </Link>{" "}

@@ -188,10 +188,11 @@ def residual_tables(pw: pl.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarra
 
 def persistence(scored: pl.DataFrame) -> np.ndarray:
     """(NPOS,) how much of a player's miss carries over from week to week, as a correlation
-    of normal scores. The simulator holds today's projection fixed for every later week, so
-    this is measured the same way: residuals of later weeks against the projection known at
-    a snapshot week. A player who turns out better (a new role, a breakout) beats a frozen
-    projection week after week; against each week's own projection it barely shows."""
+    of normal scores. The simulator's later weeks use projections made today (they don't learn
+    from games not yet played), so this is measured the same way: residuals of later weeks
+    against the projection known at a snapshot week. A player who turns out better (a new
+    role, a breakout) beats a frozen projection week after week; against each week's own
+    projection it barely shows."""
     rel = scored.select("season", "week", "sleeper_id", "position", "proj", "actual")
     parts = []
     for n in SNAPSHOTS:
