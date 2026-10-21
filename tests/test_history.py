@@ -465,3 +465,31 @@ def test_persistence_finds_a_season_long_effect_against_a_frozen_projection():
     assert 0.05 < rho["WR"] < 0.4
     assert rho["RB"] < 0.02
     assert rho["QB"] == 0.0  # no rows → independent weeks
+
+
+def test_return_table_separates_quick_returns_from_season_enders():
+    from ffcalc.simulate import RETURN_BINS
+
+    rows = []
+    for i in range(200):  # WRs out for week 6 only, back in week 7
+        rows += [
+            (2025, w, f"w{i}", "WR", "AAA", 8.0 if w != 6 else 0.0, w != 6, True)
+            for w in range(1, 18)
+        ]
+    for i in range(100):  # RBs out from week 6 on: no rows at all afterwards
+        rows += [(2025, w, f"r{i}", "RB", "AAA", 8.0, True, True) for w in range(1, 6)]
+    cols = ["season", "week", "sleeper_id", "position", "team", "proj", "played", "team_played"]
+    pw = pl.DataFrame(rows, schema=cols, orient="row")
+    t = dict(zip(POSITIONS, history.return_table(pw), strict=True))
+    assert np.allclose([r.sum() for r in t.values()], 1.0)
+    assert t["WR"][0] > 0.5  # mostly back next game (shrunk a little toward all positions)
+    assert t["RB"][RETURN_BINS - 1] > 0.9  # mostly not back this season
+    assert t["QB"][0] == 1.0  # no evidence: back right away, as before
+
+
+def test_relevant_seasons_breaks_a_tie_in_games_by_team_name():
+    cols = ["season", "week", "sleeper_id", "position", "team", "proj", "played", "team_played"]
+    rows = [(2025, w, "x", "WR", "ZZZ" if w <= 3 else "AAA", 9.0, True, True) for w in range(1, 7)]
+    for order in (rows, rows[::-1]):  # whatever order the rows arrive in
+        pw = pl.DataFrame(order, schema=cols, orient="row")
+        assert history.relevant_seasons(pw)["team"].to_list() == ["AAA"]

@@ -25,12 +25,12 @@ from . import cache
 from .clients.sleeper import stat_frame
 from .models import POSITIONS, ROLE_DEPTH, ROLES
 from .scoring import STANDARD_PPR, points, score_lines
-from .simulate import NPOS, NROLES, QGRID, Tables
+from .simulate import NPOS, NROLES, QGRID, RETURN_BINS, Tables
 
 log = logging.getLogger(__name__)
 
 HIST_SEASONS = (2022, 2023, 2024, 2025)
-TABLES_VERSION = 3  # bump when table-building logic changes, so old caches are ignored
+TABLES_VERSION = 4  # bump when table-building logic changes, so old caches are ignored
 WEEKS = range(1, 19)
 TIERS = 5
 MAX_OUT = 8  # longest absence tracked; longer ones are counted as 8
@@ -215,8 +215,8 @@ def persistence(scored: pl.DataFrame) -> np.ndarray:
         d = frozen.filter(pl.col("position") == name)
         if d.height < 50:
             continue  # shortcut: no evidence → weeks stay independent; only hit on tiny fixtures
-        r = d["r"].to_numpy()
-        z = ndtri((r.argsort().argsort() + 0.5) / len(r))
+        # average ranks for ties: the same z whatever order the joins returned rows in
+        z = ndtri((d["r"].rank("average").to_numpy() - 0.5) / d.height)
         g = (
             d.with_columns(pl.Series("z", z))
             .group_by("season", "sleeper_id", "snap")
@@ -230,6 +230,83 @@ def persistence(scored: pl.DataFrame) -> np.ndarray:
         if pairs:
             out[p] = float((g["s"] ** 2 - g["q"]).sum()) / pairs  # mean product over week pairs
     return np.clip(out, 0.0, 0.5)
+
+
+def ruled_out(pw: pl.DataFrame, n: int, reported: pl.DataFrame | None = None) -> pl.DataFrame:
+    """(season, sleeper_id, position, team) for relevant players projected before week n whose
+    team plays in week n but who aren't projected to (out, benched or cut: 0 points either way).
+    `reported` (season, week, sleeper_id) keeps only players on the injury report as Out."""
+    floor = pl.col("position").replace_strict(MIN_PROJ, default=99.0, return_dtype=pl.Float64)
+    before = (
+        pw.filter((pl.col("week") < n) & (pl.col("proj") >= floor) & pl.col("team").is_not_null())
+        .sort("week")
+        .group_by("season", "sleeper_id")
+        .agg(pl.col("position").last(), pl.col("team").last())
+    )
+    now = pw.filter(pl.col("week") == n)
+    playing = now.filter(pl.col("team_played")).select("season", "team").unique()
+    active = now.filter(pl.col("proj") > 0).select("season", "sleeper_id")
+    out = before.join(playing, on=["season", "team"]).join(
+        active, on=["season", "sleeper_id"], how="anti"
+    )
+    if reported is not None:
+        rep = reported.filter(pl.col("week") == n).select("season", "sleeper_id")
+        out = out.join(rep, on=["season", "sleeper_id"], how="semi")
+    return out
+
+
+def reported_out(injuries: pl.DataFrame, table: pl.DataFrame) -> pl.DataFrame:
+    """(season, week, sleeper_id) of players listed Out on an NFL game-status report."""
+    ids = table.select("gsis_id", "sleeper_id").drop_nulls().unique("gsis_id")
+    return (
+        injuries.filter(pl.col("report_status") == "Out")
+        .select(pl.col("season").cast(pl.Int64), pl.col("week").cast(pl.Int64), "gsis_id")
+        .join(ids, on="gsis_id")
+        .select("season", "week", "sleeper_id")
+        .unique()
+    )
+
+
+def return_table(pw: pl.DataFrame, reported: pl.DataFrame | None = None) -> np.ndarray:
+    """(NPOS, RETURN_BINS) for a player ruled out in a snapshot week: P(he misses exactly k more
+    of his team's games), last column = not back this season. Counted on the team's real schedule
+    (a player out for the season has no rows at all) as a survival curve, so late snapshots with
+    few games left don't inflate "not back"."""
+    teamweeks = pw.filter(pl.col("team_played") & pl.col("team").is_not_null())
+    teamweeks = teamweeks.select("season", "week", "team").unique()
+    played = pw.filter(pl.col("played")).select("season", "week", "sleeper_id", p=pl.lit(True))
+    k_max = RETURN_BINS - 1
+    returns = np.zeros((NPOS, k_max))
+    at_risk = np.zeros((NPOS, k_max))
+    for n in SNAPSHOTS:
+        gone = ruled_out(pw, n, reported)
+        later = (
+            gone.join(teamweeks.filter(pl.col("week") > n), on=["season", "team"])
+            .join(played, on=["season", "week", "sleeper_id"], how="left")
+            .group_by("season", "sleeper_id", "position")
+            .agg(pl.col("p").is_not_null().sort_by("week").alias("p"))
+        )
+        for pos, games in later.select("position", "p").iter_rows():
+            if pos not in POSITIONS:
+                continue
+            i = POSITIONS.index(pos)
+            for k, back in enumerate(games[:k_max]):
+                at_risk[i, k] += 1
+                if back:
+                    returns[i, k] += 1
+                    break
+    pooled = returns.sum(0) / np.maximum(at_risk.sum(0), 1)
+    out = np.zeros((NPOS, RETURN_BINS))
+    for i in range(NPOS):
+        if at_risk[i, 0] < 50:
+            continue  # shortcut: no evidence → back right away (today's rule); tiny fixtures only
+        # per-game return chance, shrunk toward all positions where this position is thin
+        h = (returns[i] + SHRINK * pooled) / (at_risk[i] + SHRINK) if at_risk[i].sum() else pooled
+        still = np.cumprod(np.r_[1.0, 1 - h])
+        out[i, :k_max] = still[:-1] * h
+        out[i, k_max] = still[-1]
+    out[out.sum(1) == 0, 0] = 1.0
+    return out
 
 
 def assign_roles(df: pl.DataFrame, by: list[str]) -> pl.DataFrame:
@@ -304,7 +381,7 @@ def relevant_seasons(pw: pl.DataFrame) -> pl.DataFrame:
             pw.filter(pl.col("team").is_not_null())
             .group_by("sleeper_id", "season", "team")
             .agg(pl.len().alias("n"))
-            .sort("n", descending=True)
+            .sort(["n", "team"], descending=[True, False])  # a tie in games → alphabetical team
             .unique(["sleeper_id", "season"], keep="first"),
             on=["sleeper_id", "season"],
         )
@@ -331,7 +408,12 @@ def injury_tables(pw: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
         (sid, season): set(g["week"].to_list())
         for (sid, season), g in pw.filter(pl.col("played")).group_by("sleeper_id", "season")
     }
-    pos_of = dict(pw.select("sleeper_id", "position").unique("sleeper_id").iter_rows())
+    pos_of = dict(
+        pw.select("sleeper_id", "position")
+        .sort("sleeper_id", "position")
+        .unique("sleeper_id", keep="first")
+        .iter_rows()
+    )
     proj_of = {
         (a, b, c): d for a, b, c, d in pw.select("sleeper_id", "season", "week", "proj").iter_rows()
     }
@@ -381,7 +463,11 @@ def status_tables(
     )
     rel = relevant_seasons(pw)
     games = pw.filter(pl.col("team_played")).select("season", "week", "team").unique()
-    pos_of = pw.select("sleeper_id", "position").unique("sleeper_id")
+    pos_of = (
+        pw.select("sleeper_id", "position")
+        .sort("sleeper_id", "position")
+        .unique("sleeper_id", keep="first")
+    )
     # every (relevant player, team game) with his status, whether or not he was projected;
     # only weeks after he played his team's previous game as a fantasy-relevant regular
     floor = pl.col("position").replace_strict(MIN_PROJ, default=99.0, return_dtype=pl.Float64)
@@ -442,8 +528,11 @@ def build_tables(
     hazard, pmf = injury_tables(pw)
     tables = Tables(edges, resid_q, floor, same, opp, hazard, pmf, source=f"sleeper {seasons}")
     tables.persist = persistence(scored)
+    tables.return_pmf = return_table(pw)
     if injuries is not None and table is not None and not injuries.is_empty():
         tables.status_play, tables.status_mult = status_tables(pw, injuries, table)
+        # the live app applies it to players with an Out/IR status: learn it on those
+        tables.return_pmf = return_table(pw, reported_out(injuries, table))
     summary = {
         "seasons": seasons,
         "player_weeks": pw.height,
@@ -451,6 +540,9 @@ def build_tables(
         "game_pairs": n_pairs,
         "hazard": dict(zip(POSITIONS, np.round(hazard, 4).tolist(), strict=True)),
         "persist": dict(zip(POSITIONS, np.round(tables.persist, 3).tolist(), strict=True)),
+        "not_back": dict(
+            zip(POSITIONS, np.round(tables.return_pmf[:, -1], 3).tolist(), strict=True)
+        ),
         "status_play": tables.status_play,
     }
     return tables, summary

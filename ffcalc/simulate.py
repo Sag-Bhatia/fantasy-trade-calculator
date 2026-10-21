@@ -30,6 +30,8 @@ NPOS = len(POSITIONS)
 NROLES = len(ROLES)
 QGRID = 101  # residual quantiles stored at u = 0, 0.01, ..., 1
 FA_PER_SLOT = 3  # free agents per position considered for an empty slot
+RETURN_BINS = 10  # 0..8 more missed games, then "not back this season"
+OUT_FOR_SEASON = 99
 
 
 @dataclass
@@ -47,6 +49,9 @@ class Tables:
     # (NPOS,) week-to-week correlation of a player's misses vs a frozen projection
     # (history.persistence); 0 = every week independent
     persist: np.ndarray = field(default_factory=lambda: np.zeros(NPOS))
+    # (NPOS, R) for a player ruled out now: P(he misses exactly k more team games), k < R-1;
+    # last column = not back this season (history.return_table). Default: back right away
+    return_pmf: np.ndarray = field(default_factory=lambda: np.eye(1, RETURN_BINS)[[0] * NPOS])
     # game status → per-position P(plays) and mean multiplier if he plays
     # placeholder defaults until history.status_tables runs on nflverse injury reports
     status_play: dict[str, list[float]] = field(
@@ -137,13 +142,19 @@ def simulate_players(inp: SimInputs, tables: Tables, sims: int, seed: int) -> Ou
     # who beats today's projection tends to keep beating it; each week's spread is unchanged
     rho = np.asarray(tables.persist, np.float32)[inp.pos]
     season_z = np.empty((sims, n_players), np.float32)
+    u_back = np.empty((sims, n_players), np.float32)
     for i, g in enumerate(gens):
         season_z[:, i] = g.standard_normal(sims, dtype=np.float32)
+        u_back[:, i] = g.random(sims, dtype=np.float32)
     keep, fresh = np.sqrt(rho)[None, :], np.sqrt(1 - rho)[None, :]
 
     points = np.zeros((sims, n_weeks, n_players), np.float32)
     known_out = np.zeros((sims, n_weeks, n_players), bool)
-    out_left = np.broadcast_to(out_weeks, (sims, n_players)).copy()
+    # a player ruled out now misses a history-drawn number of games (status minimum as floor)
+    back_cdf = np.cumsum(np.asarray(tables.return_pmf, np.float64), axis=1)[inp.pos]  # (P, R)
+    extra = (u_back[:, :, None] > back_cdf[None, :, :-1]).sum(axis=2)  # (S, P) bin index
+    missed = np.where(extra == back_cdf.shape[1] - 1, OUT_FOR_SEASON, 1 + extra)
+    out_left = np.where(out_weeks[None, :] > 0, np.maximum(out_weeks[None, :], missed), 0)
 
     for w in range(n_weeks):
         # results depend only on (seed, player id, sim, week)

@@ -320,6 +320,7 @@ def season_data(
     hazard, pmf = history.injury_tables(prior_pw)
     tables = Tables(edges, resid_q, floor, same, opp, hazard, pmf, source=f"sleeper < {season}")
     tables.persist = history.persistence(scored)
+    tables.return_pmf = history.return_table(prior_pw)
     proj = {(a, b): c for a, b, c in s.select("sleeper_id", "week", "proj").iter_rows()}
     actual = {
         (a, b): c
@@ -395,7 +396,7 @@ def calibrate(src: Any, pw: pl.DataFrame, leagues: int, progress: Any = print) -
             for n in SNAPSHOTS:
                 lg = _snapshot_league(base, tp_real, n)
                 proj = forecast_inputs(sd, lg, n)
-                inp, cfg, index = engine.build_inputs(lg, sd.table, proj, sd.tables)
+                inp, cfg, index = engine.build_inputs(lg, _status_at(sd, n), proj, sd.tables)
                 out = simulate_players(inp, sd.tables, SIMS, SEED + k)
                 res = simulate_league(out, inp, lg, cfg)
                 for t in range(N_TEAMS):
@@ -407,6 +408,18 @@ def calibrate(src: Any, pw: pl.DataFrame, leagues: int, progress: Any = print) -
     tr = pl.DataFrame(trades, schema={"season": pl.Int64, "league": pl.Int64, "snapshot": pl.Int64,
                                       "predicted": pl.Float64, "realized": pl.Float64}, orient="row")  # fmt: skip
     return Calibration(p, tr)
+
+
+def _status_at(sd: SeasonData, n: int) -> pl.DataFrame:
+    """The player table with "Out" for everyone ruled out in week n (projected earlier, his team
+    plays, he isn't projected): what an injury report would show the live app."""
+    out = history.ruled_out(sd.pw, n)["sleeper_id"]
+    return sd.table.with_columns(
+        pl.when(pl.col("sleeper_id").is_in(out.implode()))
+        .then(pl.lit("Out"))
+        .otherwise(pl.col("injury_status"))
+        .alias("injury_status")
+    )
 
 
 def _snapshot_league(base: League, tp_real: np.ndarray, n: int) -> League:

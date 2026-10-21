@@ -297,3 +297,25 @@ def test_persistence_links_a_players_weeks_without_changing_any_one_week():
     # each week's spread is the same; only the season total gets wider
     assert np.allclose(a.std(0)[0, rbs], b.std(0)[0, rbs], rtol=0.08)
     assert (b.sum(1)[:, rbs].std(0) > 1.2 * a.sum(1)[:, rbs].std(0)).all()
+
+
+def test_ruled_out_players_miss_the_drawn_number_of_games():
+    from dataclasses import replace
+
+    from ffcalc.simulate import RETURN_BINS
+
+    n, w = 3, 8
+    rb = np.full(n, POSITIONS.index("RB"))
+    none = np.full((n, w), -1)
+    inp = SimInputs([f"p{i}" for i in range(n)], rb, list(range(1, w + 1)), np.full((n, w), 10.0),
+                    np.ones((n, w)), none, none, none, out_weeks=np.array([1, 4, 0]))  # fmt: skip
+    t = replace(placeholder_tables(), hazard=np.zeros(len(POSITIONS)))  # no new injuries
+
+    def games_missed(k):  # every sim draws "misses k more games" (k = last bin: not back)
+        pmf = np.tile(np.eye(1, RETURN_BINS, k)[0], (len(POSITIONS), 1))
+        out = simulate_players(inp, replace(t, return_pmf=pmf), 50, 2)
+        return out.known_out.sum(axis=1)  # (sims, players): games he was ruled out
+
+    assert (games_missed(0) == [1, 4, 0]).all()  # the default: today's rule exactly
+    assert (games_missed(2) == [3, 4, 0]).all()  # IR's 4-game minimum still holds
+    assert (games_missed(RETURN_BINS - 1) == [w, w, 0]).all()
