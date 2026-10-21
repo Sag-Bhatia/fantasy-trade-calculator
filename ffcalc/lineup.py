@@ -96,13 +96,16 @@ def lineup_points(
     for flex_order in orders:
         chosen = np.zeros_like(av)
         fa_used = np.zeros(av.shape[0], np.int64)
+        rows = np.arange(av.shape[0])
         for _, count, elig in [*dedicated, *flex_order]:
             cand = av & ~chosen & np.isin(ps, list(elig))[None, :]
-            room = (max_free_agents - fa_used)[:, None]
-            cand &= ~fa[None, :] | (np.cumsum(cand & fa[None, :], axis=1) <= room)
-            take = cand & (np.cumsum(cand, axis=1) <= count)
-            chosen |= take
-            fa_used += (take & fa[None, :]).sum(axis=1)
+            for _ in range(count):  # one pick per slot: the best remaining candidate
+                ok = cand & (~fa[None, :] | (fa_used < max_free_agents)[:, None])
+                idx = ok.argmax(axis=1)
+                has = ok[rows, idx]
+                chosen[rows[has], idx[has]] = True
+                cand[rows[has], idx[has]] = False
+                fa_used += has & fa[idx]
         pts = (sc * chosen).sum(axis=1)
         best = pts if best is None else np.maximum(best, pts)
     assert best is not None

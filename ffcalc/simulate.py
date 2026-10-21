@@ -29,6 +29,7 @@ from .models import POSITIONS, ROLES, League
 NPOS = len(POSITIONS)
 NROLES = len(ROLES)
 QGRID = 101  # residual quantiles stored at u = 0, 0.01, ..., 1
+FA_PER_SLOT = 3  # free agents per position considered for an empty slot
 
 
 @dataclass
@@ -208,6 +209,12 @@ def team_points_one(
     """(S, W) for one roster. Free agents only fill slots the roster can't, at most one
     pickup per team-week (spec §5)."""
     fa = np.setdiff1d(fa_pool, roster)
+    # only the best few free agents per position can ever be the one pickup
+    best = []
+    for p in range(NPOS):
+        at_pos = fa[inp.pos[fa] == p]
+        best.append(at_pos[np.argsort(-out.expected[at_pos].sum(1))[:FA_PER_SLOT]])
+    fa = np.concatenate(best) if best else fa
     cand = np.concatenate([roster, fa]).astype(np.intp)
     rostered = np.r_[np.ones(len(roster)), np.zeros(len(fa))]
     res = np.zeros((out.points.shape[0], out.points.shape[1]), np.float32)

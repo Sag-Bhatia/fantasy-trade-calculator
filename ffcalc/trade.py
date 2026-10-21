@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -171,6 +172,7 @@ def apply_trade(ctx: Context, trade: Trade, cfg: Config | None = None) -> tuple[
                 fa,
                 key=lambda i: (
                     lineup_value(ctx, np.array([*active, i], dtype=np.intp)),
+                    ctx.inputs.pos[i] < 4,  # pure depth: a QB/RB/WR/TE, not a second kicker
                     _ros(ctx, i),
                 ),
             )
@@ -264,16 +266,20 @@ def verdict(title: Delta) -> str:
 
 
 def evaluate(ctx: Context, trade: Trade, sims: int = 10_000, seed: int = 7,
-             decomposition: bool = True) -> TradeResult:  # fmt: skip
+             decomposition: bool = True,
+             progress: Callable[[str], None] = lambda _: None) -> TradeResult:  # fmt: skip
+    progress("Making both rosters legal")
     cfg_after, moves = apply_trade(ctx, trade)
-    return evaluate_config(ctx, trade, cfg_after, moves, sims, seed, decomposition)
+    return evaluate_config(ctx, trade, cfg_after, moves, sims, seed, decomposition, progress)
 
 
 def evaluate_config(ctx: Context, trade: Trade, cfg_after: Config, moves: list[Move],
                     sims: int = 10_000, seed: int = 7, decomposition: bool = True,
+                    progress: Callable[[str], None] = lambda _: None,
                     ) -> TradeResult:  # fmt: skip
     """Compare `cfg_after` with the league as it is, on one shared set of player outcomes."""
     moves = moves or [Move(trade.team_a), Move(trade.team_b)]
+    progress(f"Simulating {sims:,} seasons")
     out = simulate_players(ctx.inputs, ctx.tables, sims, seed)
     tp_before = team_points(out, ctx.inputs, ctx.base, ctx.league.slots)
     tp_after = tp_before.copy()
@@ -286,6 +292,7 @@ def evaluate_config(ctx: Context, trade: Trade, cfg_after: Config, moves: list[M
         )
     before = simulate_league(out, ctx.inputs, ctx.league, ctx.base, tp_before)
     after = simulate_league(out, ctx.inputs, ctx.league, cfg_after, tp_after)
+    progress("Working out why")
     dec = (
         decompose(ctx, ctx.base, cfg_after, [ia, ib], moves, seed, sims, out)
         if decomposition
