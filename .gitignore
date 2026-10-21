@@ -13,3 +13,10 @@ data/
 # frontend: dependencies stay local; web/dist (the built app) IS committed
 web/node_modules/
 *.tsbuildinfo
+
+# working notes and assistant config: kept locally, never published
+CLAUDE.md
+GOAL.md
+NOTES.md
+.claude/
+docs/

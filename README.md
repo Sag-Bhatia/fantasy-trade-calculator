@@ -126,4 +126,4 @@ cd web && npm install && npm run build
 - The "chance they say yes" number is a rough rule of thumb, not a measurement.
 - ESPN and Sleeper projections come from unofficial endpoints. If one stops answering,
   the app keeps working with the sources it can still reach, using cached data where it has it.
-- How it works: `spec.md`. Design decisions and test results: `NOTES.md`. Accuracy: `REPORT.md`.
+- How it works: `spec.md`. Accuracy: `REPORT.md`.

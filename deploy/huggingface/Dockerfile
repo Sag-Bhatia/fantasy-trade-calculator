@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Hugging Face Space for the fantasy football trade calculator (setup: docs/hosting.md).
+# Hugging Face Space for the fantasy football trade calculator (setup steps: README.md).
 # This is the only file the Space needs: it downloads the app from GitHub and serves it on 7860.
 FROM python:3.12-slim
 
