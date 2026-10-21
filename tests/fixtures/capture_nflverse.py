@@ -39,7 +39,7 @@ rest = keep.filter(~pl.col("gsis_id").is_in(top) | pl.col("gsis_id").is_null())
 rest = rest.sort("draft_year", descending=True, nulls_last=True).head(250)
 pl.concat([in_stats, rest]).write_parquet(OUT / "ff_playerids.parquet")
 
-nfl.load_schedules([SEASON]).write_parquet(OUT / "schedules.parquet")
+nfl.load_schedules([SEASON, 2026]).write_parquet(OUT / "schedules.parquet")  # 2026: test league
 nfl.load_injuries([SEASON]).filter(pl.col("week").is_in(WEEKS)).write_parquet(
     OUT / "injuries.parquet"
 )

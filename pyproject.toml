@@ -29,6 +29,9 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "NPY"]
 
+[tool.ruff.lint.per-file-ignores]
+"ffcalc/backtest.py" = ["E501"]  # long lines are REPORT.md prose
+
 [tool.mypy]
 python_version = "3.12"
 ignore_missing_imports = true
