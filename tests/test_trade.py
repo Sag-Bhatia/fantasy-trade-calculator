@@ -70,7 +70,7 @@ def test_decomposition_sums_to_score(ctx):
         assert sum(side.decomposition.values()) == pytest.approx(side.score, abs=1e-3)
 
 
-def test_two_for_one_fills_and_cuts_roster_spots(ctx):
+def test_two_for_one_cuts_but_never_picks_up(ctx):
     give = top(ctx, 1, "WR", 2)
     get = top(ctx, 2, "RB")
     cfg, moves = apply_trade(ctx, Trade(1, 2, give, get))
@@ -82,16 +82,20 @@ def test_two_for_one_fills_and_cuts_roster_spots(ctx):
         assert len(active) <= size
         if rid == 2:
             assert move.drops and not set(move.drops) & set(give)  # never cut who you got
-    # team 1 had a full roster, gave 2 got 1 → picked up a free agent
-    assert moves[0].adds and all(ctx.index[p] not in cfg.fa_pool for p in moves[0].adds)
-    assert all(ctx.index[p] in cfg.fa_pool for p in moves[1].drops)
+    # team 1 gave 2 and got 1: its open spot stays open, no waiver pickup
+    assert (
+        moves[0].drops == []
+        and len(cfg.rosters[ctx.team_index(1)]) == len(ctx.base.rosters[ctx.team_index(1)]) - 1
+    )
+    np.testing.assert_array_equal(np.setdiff1d(cfg.fa_pool, ctx.base.fa_pool),
+                                  sorted(ctx.index[p] for p in moves[1].drops))  # fmt: skip
 
 
 def test_three_for_one(ctx):
     give = top(ctx, 1, "RB", 3)
     get = top(ctx, 2, "QB")
     cfg, moves = apply_trade(ctx, Trade(1, 2, give, get))
-    assert len(moves[0].adds) == 2 and len(moves[1].drops) == 2
+    assert moves[0].drops == [] and len(moves[1].drops) == 2
 
 
 def test_trading_someone_you_dont_own_fails(ctx):

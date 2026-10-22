@@ -87,9 +87,9 @@ outcomes; inside a sim, a player knocked out by injury is replaced by re-optimiz
 
 **Replacement level = the actual best free agent in this league.** Free agents = all
 active NFL players − every rostered player. When a trade leaves a team with an open
-roster spot (2-for-1), it is filled by the best available FA at the position that most
-improves that team's lineup value. When a team receives more players than it sends, it
-drops its lowest-value bench player. FAs are also used weekly to fill a slot that
+roster spot (2-for-1), the spot stays open: a waiver pickup isn't part of the trade, since
+the team could make it without trading. When a team receives more players than it sends,
+it drops its lowest-value bench player. FAs are also used weekly to fill a slot that
 would otherwise be empty (byes/injuries) — one pickup per team per week, best
 available, assumed obtainable (shortcut: ignores waiver priority/FAAB).
 
@@ -128,7 +128,7 @@ Title % already captures this naturally; the weighted score is the simple summar
 sequential ablation in this fixed order (each step's Δ vs the previous):
 1. **Starters** — Δ in optimal lineup points, healthy, no byes, no FA fill.
 2. **Depth** — add bench coverage of others' absences.
-3. **Waiver wire** — add best-FA fill of open slots / roster spots.
+3. **Roster cuts** — add the bench players a team must cut to fit what it receives.
 4. **Schedule and byes** — add real byes and opponent adjustments.
 5. **Injury risk** — add injury status and in-season injury rates.
 6. **Playoff weeks** — extra value from playoff-week weighting.

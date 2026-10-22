@@ -27,7 +27,7 @@ from .simulate import (
 PLAYOFF_WEIGHT = 2.0  # playoff-week points count double in the trade score (spec §7)
 VERDICT_PP = 0.005  # ±0.5 percentage points of title odds
 VERDICT_SE = 2.0
-COMPONENTS = ("Starters", "Depth", "Waiver wire", "Schedule & byes", "Injury risk", "Playoff weeks")
+COMPONENTS = ("Starters", "Depth", "Roster cuts", "Schedule & byes", "Injury risk", "Playoff weeks")
 
 
 class TradeError(ValueError):
@@ -45,7 +45,6 @@ class Trade:
 @dataclass
 class Move:
     roster_id: int
-    adds: list[str] = field(default_factory=list)  # free agents picked up
     drops: list[str] = field(default_factory=list)  # players released for roster space
 
 
@@ -112,10 +111,10 @@ def _ros(ctx: Context, i: int) -> float:
 
 
 def apply_trade(ctx: Context, trade: Trade, cfg: Config | None = None) -> tuple[Config, list[Move]]:
-    """Swap players, then make both rosters legal: cut the player the lineup misses least
-    when over the limit, add the free agent who helps the lineup most for each spot the
-    trade opened. IR players stay off the active count (a traded IR player goes to the
-    new team's IR if it has a free slot)."""
+    """Swap players, then cut the player the lineup misses least while a roster is over the
+    limit. A spot the trade opens stays open: a waiver pickup isn't part of the trade, since
+    the team could make it anyway. IR players stay off the active count (a traded IR player
+    goes to the new team's IR if it has a free slot)."""
     cfg = cfg or ctx.base
     lg = ctx.league
     ids = [t.roster_id for t in lg.teams]
@@ -137,7 +136,6 @@ def apply_trade(ctx: Context, trade: Trade, cfg: Config | None = None) -> tuple[
     ga = [ctx.index[p] for p in trade.a_gives]
     gb = [ctx.index[p] for p in trade.b_gives]
     reserve = {t: {ctx.index[p] for p in lg.teams[t].reserve if p in ctx.index} for t in (ia, ib)}
-    before_active = {t: len([i for i in rosters[t] if i not in reserve[t]]) for t in (ia, ib)}
     rosters[ia] = np.array([i for i in rosters[ia] if i not in ga] + gb, dtype=np.intp)
     rosters[ib] = np.array([i for i in rosters[ib] if i not in gb] + ga, dtype=np.intp)
     was_ir = reserve[ia] | reserve[ib]
@@ -164,21 +162,6 @@ def apply_trade(ctx: Context, trade: Trade, cfg: Config | None = None) -> tuple[
             active.remove(worst)
             move.drops.append(ctx.inputs.ids[worst])
             fa.append(worst)
-        # only spots the trade opened; a spot the team already left open stays its own business
-        target = min(lg.roster_size, before_active[team_i])
-        while len(active) < target and fa:
-            # the free agent who helps the lineup most; ties (pure depth) go to the best player
-            best = max(
-                fa,
-                key=lambda i: (
-                    lineup_value(ctx, np.array([*active, i], dtype=np.intp)),
-                    ctx.inputs.pos[i] < 4,  # pure depth: a QB/RB/WR/TE, not a second kicker
-                    _ros(ctx, i),
-                ),
-            )
-            active.append(best)
-            fa.remove(best)
-            move.adds.append(ctx.inputs.ids[best])
         rosters[team_i] = np.array(active + sorted(reserve[team_i]), dtype=np.intp)
         moves.append(move)
     return Config(rosters, np.array(sorted(set(fa)), dtype=np.intp)), moves
@@ -189,8 +172,8 @@ def apply_trade(ctx: Context, trade: Trade, cfg: Config | None = None) -> tuple[
 
 def _stage_inputs(ctx: Context, stage: int) -> tuple[SimInputs, Tables]:
     """Model features switched on cumulatively (spec §7): 0 starters only (everyone always
-    healthy, average week) · 1 depth (real in-season injury rates) · 2 waiver wire (the
-    trade's own pickups/cuts; same inputs) · 3 schedule & byes (real weekly projections) ·
+    healthy, average week) · 1 depth (real in-season injury rates) · 2 roster cuts (the
+    trade's forced cuts; same inputs) · 3 schedule & byes (real weekly projections) ·
     4 injury risk (current injury news) · 5 playoff-week weighting (same inputs)."""
     inp, tab = ctx.inputs, copy.copy(ctx.tables)
     if stage >= 4:
@@ -217,7 +200,7 @@ def decompose(ctx: Context, cfg_before: Config, cfg_after: Config, teams: list[i
     on (stage order fixed, so it depends on that order); components sum to the total.
     All stages share the seed and sim count, and the last two reuse the headline outcomes
     (`full`), so the total equals the headline trade score exactly. Weekly free-agent fill
-    of empty slots is on throughout; "Waiver wire" is the trade's own roster moves."""
+    of empty slots is on throughout; "Roster cuts" is the trade's forced cuts."""
     ww = week_weights(ctx)
     no_moves = _without_moves(ctx, cfg_before, cfg_after, teams, moves)
     vals: dict[int, list[float]] = {t: [] for t in teams}
@@ -245,12 +228,12 @@ def decompose(ctx: Context, cfg_before: Config, cfg_after: Config, teams: list[i
 def _without_moves(
     ctx: Context, before: Config, after: Config, teams: list[int], moves: list[Move]
 ) -> Config:
-    """After-trade rosters with the trade's pickups removed and its cuts put back."""
+    """After-trade rosters with the trade's cuts put back."""
     rosters = [r.copy() for r in after.rosters]
     for t, move in zip(teams, moves, strict=True):
-        adds = {ctx.index[p] for p in move.adds}
-        drops = [ctx.index[p] for p in move.drops]
-        rosters[t] = np.array([i for i in rosters[t] if i not in adds] + drops, dtype=np.intp)
+        rosters[t] = np.concatenate([rosters[t], [ctx.index[p] for p in move.drops]]).astype(
+            np.intp
+        )
     return Config(rosters, before.fa_pool)
 
 

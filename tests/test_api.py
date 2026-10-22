@@ -196,7 +196,7 @@ def test_grade_stream_matches_engine(client, ctx):
         assert [x["part"] for x in t["decomposition"]] == list(d.decomposition)
         assert sum(x["value"] for x in t["decomposition"]) == pytest.approx(t["score"], abs=0.05)
         assert len(t["weekly_delta"]) == len(res["weeks"])
-        assert set(t["moves"]) == {"adds", "drops"}
+        assert set(t["moves"]) == {"drops"}
     assert res["market"]["give"] == direct.market.a_gives.total
     assert res["market"]["get"] == direct.market.b_gives.total
     assert 0 <= res["acceptance"] <= 1 and isinstance(res["warnings"], list)

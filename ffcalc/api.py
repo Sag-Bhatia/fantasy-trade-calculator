@@ -160,7 +160,6 @@ def _team_result(e: Entry, res: TradeResult, r: TeamResult) -> dict[str, Any]:
         "decomposition": [{"part": k, "value": round(v, 2)} for k, v in r.decomposition.items()],
         "weekly_delta": [round(float(x), 2) for x in weekly],
         "moves": {
-            "adds": [_brief(e, p) for p in r.moves.adds],
             "drops": [_brief(e, p) for p in r.moves.drops],
         },
     }
@@ -460,12 +459,12 @@ def preview(b: PreviewBody) -> dict[str, Any]:
     if n_get > n_give:
         note = (
             "You receive more players than you send, so the full grade cuts your least useful "
-            f"bench player, and {partner} gets an open spot filled by the best free agent."
+            f"bench player, and {partner}'s open spot stays empty."
         )
     elif n_get < n_give:
         note = (
-            f"You send more players than you receive, so the full grade adds the best free "
-            f"agent to your open spot, and {partner} cuts its least useful bench player."
+            "You send more players than you receive, so your open spot stays empty in the "
+            f"full grade, and {partner} cuts its least useful bench player."
         )
     else:
         note = "Same number of players each way, so no roster moves are needed."
@@ -532,11 +531,10 @@ def _offer(e: Entry, s: finder.Suggestion) -> dict[str, Any]:
         "moves": [
             {
                 "roster_id": m.roster_id,
-                "adds": [_brief(e, p) for p in m.adds],
                 "drops": [_brief(e, p) for p in m.drops],
             }
             for m in s.moves
-            if m.adds or m.drops
+            if m.drops
         ],
     }
 

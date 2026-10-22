@@ -12,7 +12,7 @@ import type { BalanceResult, Change, GradeResult, TeamResult } from "../types";
 const EXPLAIN: Record<string, string> = {
   Starters: "Who you’d start in an average week with everyone healthy. Swapping two starters for one better one shows up here.",
   Depth: "How well the bench covers injuries over the season. Sending two players away for one thins it out.",
-  "Waiver wire": "The free agent picked up for an open roster spot, or the player cut to make room.",
+  "Roster cuts": "The bench player cut to make room for the extra players you receive.",
   "Schedule & byes": "Real weekly matchups and bye weeks for the players involved.",
   "Injury risk": "Current injury news, like a player listed as questionable this week.",
   "Playoff weeks": "Playoff weeks count double, because that’s when titles are won.",
@@ -123,7 +123,7 @@ function summary(r: GradeResult): string {
   const words: Record<string, string> = {
     Starters: "who you’d start",
     Depth: "bench depth",
-    "Waiver wire": "the waiver move",
+    "Roster cuts": "the roster cut",
     "Schedule & byes": "matchups and byes",
     "Injury risk": "injury news",
     "Playoff weeks": "the playoff weeks",
@@ -393,9 +393,7 @@ function WeekTiles({ r, week, setWeek }: { r: GradeResult; week: number; setWeek
 
 function Moves({ r }: { r: GradeResult }) {
   const rows = [
-    ...r.a.moves.adds.map((p) => ({ k: `a+${p.id}`, tag: "Add", tone: "up" as const, text: `${p.name}, ${p.pos}, fills your open spot` })),
     ...r.a.moves.drops.map((p) => ({ k: `a-${p.id}`, tag: "Cut", tone: "down" as const, text: `You drop ${p.name}, ${p.pos}` })),
-    ...r.b.moves.adds.map((p) => ({ k: `b+${p.id}`, tag: "Add", tone: "up" as const, text: `${r.b.name} adds ${p.name}, ${p.pos}` })),
     ...r.b.moves.drops.map((p) => ({ k: `b-${p.id}`, tag: "Cut", tone: "down" as const, text: `${r.b.name} drops ${p.name}, ${p.pos}` })),
   ];
   if (!rows.length) return <p className="text-[15px]">Both rosters stay legal without any pickups or cuts.</p>;

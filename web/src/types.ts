@@ -75,7 +75,7 @@ export type TeamResult = {
   score: number;
   decomposition: { part: string; value: number }[];
   weekly_delta: number[];
-  moves: { adds: Player[]; drops: Player[] };
+  moves: { drops: Player[] };
 };
 
 export type GradeResult = {
@@ -102,7 +102,7 @@ export type Offer = {
   me_points: number;
   them_points: number;
   market_gap: number | null;
-  moves: { roster_id: number; adds: Player[]; drops: Player[] }[];
+  moves: { roster_id: number; drops: Player[] }[];
 };
 
 export type FindResult = { checked: number; rosters: number; offers: Offer[] };

@@ -16,14 +16,8 @@ def _team(ctx: Context, r: TeamResult, gives: list[str], gets: list[str]) -> lis
         f"  gives: {', '.join(ctx.name(p) for p in gives) or '—'}",
         f"  gets:  {', '.join(ctx.name(p) for p in gets) or '—'}",
     ]
-    if r.moves.adds or r.moves.drops:
-        lines.append(
-            "  roster moves: "
-            + ", ".join(
-                [f"add {ctx.name(p)}" for p in r.moves.adds]
-                + [f"drop {ctx.name(p)}" for p in r.moves.drops]
-            )
-        )
+    if r.moves.drops:
+        lines.append("  roster moves: " + ", ".join(f"drop {ctx.name(p)}" for p in r.moves.drops))
     lines += [
         f"  playoff odds: {r.playoff_before:6.1%} → {r.playoff_after:6.1%}"
         f"  ({_pp(r.playoff.value)} ± {r.playoff.se * 100:.1f})",
