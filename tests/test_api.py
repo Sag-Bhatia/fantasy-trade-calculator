@@ -313,9 +313,12 @@ def test_spa_fallback(client, monkeypatch, tmp_path):
     (dist / "assets").mkdir(parents=True)
     (dist / "index.html").write_text("<html>the app</html>")
     (dist / "assets" / "app.js").write_text("console.log(1)")
-    assert "the app" in client.get("/").text
+    r = client.get("/")
+    assert "the app" in r.text and r.headers["cache-control"] == "no-store"
+    assert "etag" not in r.headers  # a file-date ETag kept stale pages after a deploy
     assert "the app" in client.get("/league/123/trade").text  # client-side route
     assert client.get("/assets/app.js").text == "console.log(1)"
+    assert client.get("/assets/old-build.js").status_code == 404  # not the page
     r = client.get("/api/nope")
     assert r.status_code == 404 and "detail" in r.json()
     assert "root:" not in client.get("/%2e%2e/%2e%2e/%2e%2e/etc/passwd").text

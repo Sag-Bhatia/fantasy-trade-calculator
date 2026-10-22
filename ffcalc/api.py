@@ -595,7 +595,8 @@ NOT_BUILT = (
 
 @app.get("/{path:path}", include_in_schema=False)
 def web(path: str) -> Any:
-    if path == "api" or path.startswith("api/"):
+    if path == "api" or path.startswith(("api/", "assets/")) and not (DIST / path).is_file():
+        # a missing asset must be a 404: the page in its place breaks the browser silently
         raise HTTPException(404, "There's no such address.")
     index = DIST / "index.html"
     if not index.exists():
@@ -603,4 +604,6 @@ def web(path: str) -> Any:
     f = (DIST / path).resolve()
     if path and f.is_file() and f.is_relative_to(DIST.resolve()):
         return FileResponse(f)
-    return FileResponse(index)  # any other page: the single-page app handles it
+    # any other page: the single-page app handles it. Never cached, and no file-date ETag:
+    # Vercel dates every file 2018, so a same-size new index.html looked unchanged (304)
+    return HTMLResponse(index.read_text(), headers={"Cache-Control": "no-store"})
